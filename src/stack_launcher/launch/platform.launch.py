@@ -9,8 +9,13 @@ in deployment:=local. Either way, the platform side is the same (docs/DESIGN_PHI
     platform:=f1tenth  rbsf_f1tenth_gym/f1tenth_gym.launch.py + rbsf_safety/drive_gate.launch.py
 
 Every platform gives /<robot>/{scan,odom} and takes /<robot>/drive, which only drive_gate
-publishes; commands go to /<robot>/drive_gate/auto_cmd. The simulators are looked up at runtime
-(they are not dependencies: the robot image does not ship them).
+publishes; commands go to /<robot>/drive_gate/auto_cmd. `odom` is always in the <robot>/odom frame
+(TF <robot>/odom -> <robot>/base_link), but its producer depends on the platform: RF2O laser
+odometry on real (LiDAR-first; the VESC's odometry is too noisy), relabelled ground truth on the
+simulators (RF2O does poorly in their feature-poor worlds), which also publish
+/<robot>/ground_truth/odom and /ground_truth/map. map -> <robot>/odom belongs to the mapping
+slot. The simulators are looked up at runtime (they are not dependencies: the robot image does
+not ship them).
 """
 
 from launch import LaunchDescription

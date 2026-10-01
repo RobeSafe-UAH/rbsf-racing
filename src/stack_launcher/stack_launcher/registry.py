@@ -13,6 +13,9 @@ DEPLOYMENTS = ('local', 'distributed')
 IMPLEMENTATIONS = {
     'mapping': {
         'identity': ('rbsf_identity', 'mapping.launch.py'),
+        'slam_toolbox': ('rbsf_dual_slam', 'slam_toolbox.launch.py'),
+        'cartographer': ('rbsf_dual_slam', 'cartographer.launch.py'),
+        'dual_slam': ('rbsf_dual_slam', 'dual_slam.launch.py'),
     },
     'localization': {
         'identity': ('rbsf_identity', 'localization.launch.py'),

@@ -2,10 +2,11 @@
 Behaviour: autonomous exploration.
 
 The car drives on its own by following a wall while the mapping slot builds the map (legacy
-02_autonomous_slam).
+02_autonomous_slam). By default the mapper is DualSLAM: SLAM Toolbox (owns /map and
+map -> <robot>/odom) and Cartographer (on /<robot>/mapping/cartographer/map) side by side.
 
 Slots (defaults, each overridable with <slot>:=<implementation>):
-    mapping       identity        (becomes the SLAM mapper once it is ported)
+    mapping       dual_slam       (slam_toolbox, cartographer or identity also work)
     localization  identity
     perception    identity
     planning      identity
@@ -15,6 +16,9 @@ Quick start:
     ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=levine
     ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth
     ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real
+Save both maps (PGM + YAML for the offline map tools, plus each SLAM's own state) into
+maps/<YYYYMMDD_HHMMSS>/ with joystick button Y, or:
+    ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger
 Distributed (same ROS_DOMAIN_ID on both machines):
     car:      ros2 launch stack_launcher platform.launch.py platform:=real
     compute:  ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real \
@@ -32,7 +36,7 @@ from stack_launcher.registry import (
     DEPLOYMENTS, IMPLEMENTATIONS, PLATFORMS, SLOTS, USE_SIM_TIME, validate)
 
 DEFAULT_SLOTS = {
-    'mapping': 'identity',
+    'mapping': 'dual_slam',
     'localization': 'identity',
     'perception': 'identity',
     'planning': 'identity',

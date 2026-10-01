@@ -12,6 +12,7 @@
   <exec_depend>ament_index_python</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rbsf_dual_slam</exec_depend>
   <exec_depend>rbsf_identity</exec_depend>
   <exec_depend>rbsf_safety</exec_depend>
   <exec_depend>rbsf_wall_following</exec_depend>

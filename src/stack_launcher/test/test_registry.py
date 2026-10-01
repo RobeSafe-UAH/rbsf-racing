@@ -16,6 +16,12 @@ def test_valid_selection():
     validate('real', 'distributed', VALID)
 
 
+@pytest.mark.parametrize('mapping', ['slam_toolbox', 'cartographer', 'dual_slam'])
+def test_slam_mappers_are_registered(mapping):
+    assert IMPLEMENTATIONS['mapping'][mapping][0] == 'rbsf_dual_slam'
+    validate('real', 'distributed', {**VALID, 'mapping': mapping, 'controller': 'wall_following'})
+
+
 @pytest.mark.parametrize('platform, deployment, slots, message', [
     ('foo', 'local', VALID, "platform 'foo'"),
     ('real', 'remote', VALID, "deployment 'remote'"),

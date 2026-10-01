@@ -220,3 +220,6 @@ __marimo__/
 # ROS 2 / colcon
 install/
 log/
+
+# Saved maps (rbsf_dual_slam map_saver)
+maps/
