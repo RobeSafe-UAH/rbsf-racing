@@ -61,23 +61,33 @@ The platform is not a slot. It is chosen by `platform:=` and is always present. 
 gives each car the same interface. This is the existing simulator contract from `CLAUDE.md`:
 
 - `/<ns>/scan` (`sensor_msgs/LaserScan`, frame `<ns>/laser`)
-- `/<ns>/odom` (`nav_msgs/Odometry`, child frame `<ns>/base_link`)
+- `/<ns>/odom` (`nav_msgs/Odometry`, frame `<ns>/odom`, child frame `<ns>/base_link`), and TF
+  `<ns>/odom -> <ns>/base_link`
 - `/<ns>/drive` (`ackermann_msgs/AckermannDriveStamped`), written **only** by `drive_gate`
 - `/<ns>/collision` (`std_msgs/Bool`), simulators only
 - TF `<ns>/base_link` and `<ns>/laser` on the global `/tf`
+- Simulators only: `/<ns>/ground_truth/odom` (frame `map`) and the track's map on
+  `/ground_truth/map` (latched). The platform never publishes `/map` or `map -> <ns>/odom`: they
+  belong to the mapping slot (§3.2).
 
 The platform side also always runs the **joystick** and **`drive_gate`** (§6), on every
 platform and in every deployment.
 
-| Platform | Package(s) | `odom` |
+| Platform | Package(s) | `odom` producer |
 |---|---|---|
-| `real` | `rbsf_bringup` + `vesc` submodule (VESC), `urg_node` (Hokuyo), `joy` | Wheel odometry in `<ns>/odom` |
-| `mvsim` | `rbsf_mvsim` (`mvsim_adapter`) | Ground truth in `map` |
-| `f1tenth` | `rbsf_f1tenth_gym` (`gym_bridge`) | Ground truth in `map` |
+| `real` | `rbsf_bringup` + `vesc` submodule (VESC), `urg_node` (Hokuyo), `rf2o_laser_odometry` (`state_estimation/`), `joy` | RF2O laser odometry |
+| `mvsim` | `rbsf_mvsim` (`mvsim_adapter`) | Ground truth, relabelled `<ns>/odom` |
+| `f1tenth` | `rbsf_f1tenth_gym` (`gym_bridge`) | Ground truth, relabelled `<ns>/odom` |
 
-The simulators' `odom` is ground truth in the `map` frame, and the real car's is not. That
-difference is why localization is a separate slot. The identity localizer is only valid where
-`odom` is already in `map`.
+The `odom` contract is the same on every platform, but its producer is platform-dependent. The
+real car is **LiDAR-first**: the VESC's odometry (wheel speed + servo command, with or without
+its IMU) is too noisy to feed TF or SLAM. This was a problem in the legacy stack, and other
+teams have reported the same. So RF2O estimates `odom` from the scans, and the VESC's odometry
+is kept on `vesc/odom` for diagnostics only. On the simulators RF2O does poorly (the synthetic
+worlds are feature-poor), and ground truth is available. Their `odom` is that ground truth,
+with the `<ns>/odom` origin at the map origin, so `map -> <ns>/odom` is the identity unless a
+SLAM estimates it. Real odometry drifts and simulated odometry does not. That difference is
+why localization is a separate slot.
 
 ### 3.2 Functional components
 
@@ -88,28 +98,37 @@ at a glance.
 
 | Slot | Responsibility | Implementations (current / planned) | Identity |
 |---|---|---|---|
-| **mapping** | Provide `/map`. If it does SLAM, it also owns `map -> <ns>/odom`. | `slam_toolbox` (SLAM), `map_server` (known track from `rbsf_worlds`) | Publishes nothing new. The platform's `/map` (simulators) is used as is. |
-| **localization** | Estimate the car's pose in `map`. | particle filter / AMCL on a known map | Relays the platform's `odom` (valid only where `odom` is in `map`: simulators, or alongside a SLAM mapper). |
+| **mapping** | Provide `/map`. If it does SLAM, or is the identity, it also owns `map -> <ns>/odom`. | `dual_slam`, `slam_toolbox`, `cartographer` (SLAM, `rbsf_dual_slam`); `map_server` (known track from `rbsf_worlds`, planned) | Static identity `map -> <ns>/odom`, and on the simulators `/ground_truth/map` relayed to `/map`. |
+| **localization** | Estimate the car's pose in `map`. | particle filter / AMCL on a known map | `odom` composed with `map -> <ns>/odom` (TF) on `localization/odom`. A real map-frame pose alongside a SLAM mapper, ground truth on the simulators. |
 | **perception** | Detect opponents and obstacles. | LiDAR opponent detection | Publishes an empty opponent list at a fixed rate. |
 | **planning** | Produce the trajectory to follow: global line, overtaking, avoidance. | raceline / overtaking planner | Republishes the track's reference line (`rbsf_worlds`, `track:=`) as the trajectory. |
 | **controller** | Turn trajectory + pose (or raw scan, for reactive controllers) into an Ackermann command. | `pure_pursuit`, `wall_following` | Publishes zero commands (speed 0, steering 0). The car stays still. |
 
 **Mapping owns SLAM.** Exactly one component publishes `map -> <ns>/odom`:
 
-- **SLAM** (exploration, teleop mapping). Mapping is `slam_toolbox` and publishes `/map` and
-  `map -> <ns>/odom`. Localization is identity and composes that TF with `odom`.
+- **SLAM** (exploration, teleop mapping). Mapping is a SLAM (`dual_slam` by default) and
+  publishes `/map` and `map -> <ns>/odom`. Localization is identity and composes that TF with
+  `odom`.
 - **Known map** (racing). Mapping is `map_server` (static `/map` from `rbsf_worlds`).
   Localization is a particle filter and owns `map -> <ns>/odom`.
-- **Simulators with ground truth.** Mapping and localization are both identity.
+- **Simulators with ground truth.** Mapping and localization are both identity. The identity
+  mapping publishes the identity `map -> <ns>/odom` (exact, since sim odometry is ground truth).
+
+**DualSLAM** (`rbsf_dual_slam/dual_slam.launch.py`) runs SLAM Toolbox and Cartographer on the
+same scans. Only the primary (SLAM Toolbox) owns `/map` and `map -> <ns>/odom`. Cartographer
+runs with `publish_to_tf = false` and publishes `/<ns>/mapping/cartographer/map` in its own frame
+`<ns>/cartographer/map`. `map_overlay` hangs that frame below `map` with a least-squares fit of
+the two trajectories. It is a leaf frame, so the single-owner rule holds. One `map_saver` saves
+both maps (§4.1).
 
 ### 3.3 Identity components
 
 An identity implementation honours its slot's contract with **neutral values, not silence**.
 An empty opponent list says "no opponents". A missing message could equally mean "perception
 crashed". Because identity components publish, consumers can apply the same timeouts whichever
-implementation is plugged in, and a stale input is always an error. The one exception is
-mapping. Its identity publishes nothing, because `/map` (where a platform provides it) is
-latched and already exists.
+implementation is plugged in, and a stale input is always an error. The identity mapping
+publishes the identity `map -> <ns>/odom` and, on the simulators, relays the latched
+`/ground_truth/map` to `/map`. On the real car there is no map to give.
 
 ### 3.4 Behaviour layer
 
@@ -131,9 +150,11 @@ internals.
 
 | Direction | Topic | Type | Notes |
 |---|---|---|---|
-| in | `scan`, `odom` | LaserScan, Odometry | SLAM implementations only |
+| in | `scan`, TF `<ns>/odom -> <ns>/base_link` | LaserScan | SLAM implementations only |
 | out | `/map` | `nav_msgs/OccupancyGrid` | Transient local (latched) |
-| out | TF `map -> <ns>/odom` | | SLAM implementations only |
+| out | TF `map -> <ns>/odom` | | SLAM and identity implementations |
+| out | `mapping/<impl>/map` | `nav_msgs/OccupancyGrid` | Secondary SLAM of `dual_slam` (frame `<ns>/<impl>/map`) |
+| service | `mapping/save_maps` | `std_srvs/Trigger` | SLAM implementations. Writes `maps/<stamp>/<impl>/map.{pgm,yaml}` (nav2 format) + native state + `session.yaml` |
 
 **Localization**
 
@@ -212,9 +233,9 @@ Planned behaviours (legacy equivalents in parentheses):
 
 | Behaviour | mapping | localization | perception | planning | controller |
 |---|---|---|---|---|---|
-| `teleop_mapping` (`00_teleop_slam`) | slam_toolbox | identity | identity | identity | identity |
+| `teleop_mapping` (`00_teleop_slam`) | dual_slam | identity | identity | identity | identity |
 | `wall_following` (`01_wall_following`) | identity | identity | identity | identity | wall_following |
-| `autonomous_exploration` (`02_autonomous_slam`) | slam_toolbox | identity | identity | identity | wall_following |
+| `autonomous_exploration` (`02_autonomous_slam`) | dual_slam | identity | identity | identity | wall_following |
 | `raceline_tracking` (`03_centerline_tracking`) | map_server | particle filter (identity in sim) | identity | identity | pure_pursuit |
 
 ### 5.2 Deployment
@@ -327,17 +348,33 @@ Only after steps 5 and 6 pass may the car run on the ground.
 
 ## 7. Repository layout and conventions
 
+Directories follow the four blocks of the ForzaETH race stack (state estimation, perception,
+planning, control) on top of the platform (`base_system`). Blocks group code; slots (§3.2) are
+the launch-time contracts. The two are related but not the same:
+
+| Block (directory) | Slots | Also holds |
+|---|---|---|
+| `state_estimation/` | mapping, localization | Odometry estimators the platform runs to produce `odom` (RF2O). Not a slot: the platform picks the producer (§3.1) |
+| `perception/` | perception | |
+| `planning/` | planning | |
+| `controller/` | controller | |
+
+Mapping and localization stay separate slots inside one block, so that exactly one of them owns
+`map -> <ns>/odom` (§3.2, §8).
+
 ```
 src/
-  base_system/       # platforms and shared infrastructure
+  base_system/       # platform: drivers, simulators, worlds, safety
     vesc/                # submodule: f1tenth/vesc (jazzy), VESC driver + Ackermann/odom
-    rbsf_bringup/        # real-car drivers launch
+    rbsf_bringup/        # real-car drivers launch (starts RF2O for odom)
     rbsf_mvsim/          # MVSim platform
     rbsf_f1tenth_gym/    # f1tenth_gym platform (+ f1tenth_gym_ros submodule)
     rbsf_worlds/         # tracks: maps + reference lines
     rbsf_safety/         # drive_gate
-  mapping/           # rbsf_slam_toolbox, ...
-  localization/      # particle filter, ...
+  state_estimation/  # mapping + localization slots, odometry estimators
+    rbsf_dual_slam/      # mapping: slam_toolbox, cartographer, dual_slam; map saver
+    rf2o_laser_odometry/ # RF2O laser odometry (Jazzy port, GPL-3.0), real-car odom
+    ...                  # (planned) particle filter
   perception/        # opponent detection, ...
   planning/          # planners, ...
   controller/        # rbsf_pure_pursuit, rbsf_wall_following, ...
@@ -387,7 +424,8 @@ src/
 - How STOPPED's "brake active" maps to the VESC (brake current vs. zero speed). Today STOPPED
   sends speed 0, which the VESC's speed loop holds.
 - Neutral outputs of the identity components (§3.3). Today the identities launch nothing,
-  except localization (`odom_relay`, `odom` -> `localization/odom`). The empty opponent list,
+  except mapping (identity `map -> <ns>/odom`, `/ground_truth/map` relay) and localization
+  (`odom_relay`, `odom` in `map` on `localization/odom`). The empty opponent list,
   the reference-line trajectory and the zero command come with `rbsf_msgs` and their first
   consumer.
 - Migration of what exists today:

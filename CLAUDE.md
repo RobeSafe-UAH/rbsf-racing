@@ -113,9 +113,11 @@ editing the Dockerfile:
   opponents `/opponents/or0`, `/opponents/or1`, ... (numbered from 0). `rbsf_f1tenth_gym` applies
   this to the unmodified upstream bridge by patching `opp_suffix` and remapping its global topics;
   its `test_upstream_bridge.py` fails if upstream changes those internals.
-- Package names use the `rbsf_` prefix. Group packages under `src/<layer>/`
-  (`base_system`, `localization`, `controller`, and new layers such as `planning` or
-  `perception` as needed).
+- Package names use the `rbsf_` prefix. Group packages under `src/<block>/`, following the
+  ForzaETH blocks on top of the platform: `base_system` (drivers, simulators, worlds, safety),
+  `state_estimation` (mapping and localization slots, odometry estimators), `perception`,
+  `planning`, `controller`; plus `common` and `stack_launcher`. Blocks group code, slots are
+  launch contracts (`docs/DESIGN_PHILOSOPHY.md` §7).
 - Each node module starts with a docstring that lists its subscribed and published topics
   with message types, followed by a short outline of the algorithm. Keep this practice.
 - Launch files are Python (`*.launch.py`) and use `OpaqueFunction` + `launch_setup(context)`
@@ -139,7 +141,9 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   tested yet.
 - [x] Wall-following controller (`rbsf_wall_following`), verified in MVSim and f1tenth_gym
 - [x] Safety gate (`rbsf_safety` / `drive_gate`), verified in sim
-- [ ] SLAM Toolbox integration and map saving (mapping slot)
+- [x] SLAM integration and map saving (mapping slot): DualSLAM (`rbsf_dual_slam`), verified in
+  MVSim and f1tenth_gym. Cartographer does not close the start/finish loop on spielberg yet
+  (`min_score` trade-off, see `config/cartographer_sim.lua`)
 - [x] Top-level launchers (`stack_launcher`) with `platform:=real|mvsim|f1tenth`,
   `deployment:=local|distributed`
 - [ ] Real-car validation (design doc §6.4 checklist, then wall-following gains)
@@ -150,8 +154,23 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
 - Simulators: MVSim (`rbsf_mvsim`) and f1tenth_gym (`f1tenth_gym_ros` `dev-jazzy` submodule, pure
   upstream, wrapped by `rbsf_f1tenth_gym`), both dev-image only. Simulator packages live in
   `src/base_system/` next to the hardware packages as drop-in replacements: every simulator must
-  give each car `/<ns>/{scan,odom,drive,collision}` with `odom` in the `map` frame and TF frames
-  `<ns>/base_link`, `<ns>/laser` on the global `/tf`. Decided 2026-10-01.
+  give each car `/<ns>/{scan,odom,drive,collision}` and TF frames `<ns>/base_link`, `<ns>/laser`
+  on the global `/tf`. Decided 2026-10-01.
+- Odometry contract, same on every platform: `odom` in the `<ns>/odom` frame plus TF
+  `<ns>/odom -> <ns>/base_link`. No platform publishes `/map` or `map -> <ns>/odom`: the mapping
+  slot owns both (identity mapping = identity TF + `/ground_truth/map` relay). Simulators also
+  publish `/<ns>/ground_truth/odom` (frame `map`) and `/ground_truth/map`. Decided 2026-10-01.
+- The odom *producer* is platform-dependent. The real car is LiDAR-first: RF2O
+  (`src/state_estimation/rf2o_laser_odometry`, vendored Jazzy port of MAPIRlab's `ros2` branch, GPL-3.0,
+  see its `PORTING.md`). VESC odom/IMU never feeds TF or SLAM: it was too noisy in the legacy
+  stack, and other teams reported the same. It stays on `vesc/odom` for diagnostics. Simulators
+  use ground truth relabelled to `<ns>/odom`: RF2O degrades in feature-poor synthetic worlds.
+  Decided 2026-10-01.
+- Mapping: DualSLAM (`rbsf_dual_slam`). SLAM Toolbox is primary (owns `/map` + TF), and
+  Cartographer is secondary (`publish_to_tf = false`, `/<ns>/mapping/cartographer/map`, aligned by
+  `map_overlay`). `map_saver` writes nav2-format PGM/YAML per SLAM for the offline map tools.
+  Cartographer uses odometry in sim and runs LiDAR-only on the real car (RF2O would count the
+  scans twice). Decided 2026-10-01.
 - Tracks (maps + reference lines) and world/map tools live in the shared `rbsf_worlds` package;
   simulators and controllers take `track:=<name>`. Reference lines are closed loops ordered in the
   driving direction. Decided 2026-10-01.
@@ -164,6 +183,10 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   - Mapping owns SLAM. Exactly one component publishes `map -> <ns>/odom`.
   - Safety is `drive_gate` in its own `rbsf_safety` package, on the car side. It fails closed,
     and autonomous motion on `real` always requires the deadman.
+  - Directories follow the ForzaETH race-stack blocks (`state_estimation`, `perception`,
+    `planning`, `controller`) on top of `base_system`. Mapping and localization are two slots in
+    the `state_estimation` block. Odometry estimators (RF2O) live there too, but they are not a
+    slot: the platform launches them. Decided 2026-10-01.
 
 ## Open decisions
 

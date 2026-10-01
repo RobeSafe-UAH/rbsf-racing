@@ -46,8 +46,10 @@ Every car lives in its own namespace, in simulation and on the real cars:
 | `/r0`, `/r1` | Our cars (real or simulated ego). TF frames: `r0/base_link`, `r0/laser`, ... |
 | `/opponents/or0`, `/opponents/or1`, ... | Simulated opponents, numbered from 0 |
 
-Inside each namespace: `scan` (`sensor_msgs/LaserScan`), `odom` (`nav_msgs/Odometry`) and
-`drive` (`ackermann_msgs/AckermannDriveStamped`). `/map` and `/tf` are global.
+Inside each namespace: `scan` (`sensor_msgs/LaserScan`), `odom` (`nav_msgs/Odometry`, frame
+`<ns>/odom`) and `drive` (`ackermann_msgs/AckermannDriveStamped`). `/map` and `/tf` are global.
+The TF tree is `map -> <ns>/odom -> <ns>/base_link -> <ns>/laser`, and `map -> <ns>/odom` belongs
+to the mapping slot (a SLAM, or the identity when there is none).
 
 ## Tracks
 
@@ -76,14 +78,28 @@ shuts the whole stack down. Its state is on `/<ns>/drive_gate/state`.
 ### Autonomous exploration
 
 The car follows a wall (`rbsf_wall_following`, PI on two LiDAR rays, with gap and corner
-handling) while the mapping slot builds the map (identity for now; SLAM comes next).
+handling) while the mapping slot builds the map. The default mapper is DualSLAM
+(`rbsf_dual_slam`): SLAM Toolbox and Cartographer map side by side from the same scans.
 
 ```bash
-ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=iros2026
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=spielberg
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth track:=spielberg
 #   robot:=r0  headless:=true  foxglove:=false  rviz:=false  joy:=false  require_deadman:=true
-#   mapping:=identity ... controller:=wall_following
+#   mapping:=dual_slam|slam_toolbox|cartographer|identity ... controller:=wall_following
+
+# Save both maps (gamepad Y does the same):
+ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger
 ```
+
+- SLAM Toolbox is the primary mapper: it publishes `/map` and owns `map -> r0/odom`.
+  Cartographer runs without TF on `/r0/mapping/cartographer/map`, in the frame
+  `r0/cartographer/map`. `map_overlay` fits that frame to `map` from both trajectories, so the
+  two maps overlay in Foxglove.
+- A save writes `maps/<YYYYMMDD_HHMMSS>/{slam_toolbox,cartographer}/map.{pgm,yaml}` (nav2
+  map_server format, the input of the offline map cleaning and centerline tools), each SLAM's
+  own state (`posegraph.*`, `map.pbstream`), and `session.yaml` (platform, track, and each map's
+  frame and pose in `map`). Save after driving a little past the start line, so the end of the
+  lap is in both maps.
 
 - On a track with a reference line, the car follows its outer wall (right on counter-clockwise
   tracks, left on clockwise ones). Gains and distances are in
@@ -103,8 +119,11 @@ ros2 launch stack_launcher platform.launch.py platform:=real                    
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed  # laptop
 ```
 
-`rbsf_bringup` starts the VESC (`/dev/sensors/vesc`), the Hokuyo (Ethernet, 192.168.0.10), the
-joystick (`/dev/input/js0`, pair a Bluetooth gamepad on the host first) and `drive_gate`.
+`rbsf_bringup` starts the VESC (`/dev/sensors/vesc`), the Hokuyo (Ethernet, 192.168.0.10), RF2O
+laser odometry, the joystick (`/dev/input/js0`, pair a Bluetooth gamepad on the host first) and
+`drive_gate`. Odometry is LiDAR-first: `odom` and its TF come from RF2O
+(`src/state_estimation/rf2o_laser_odometry`, a Jazzy port of MAPIRlab's package, GPL-3.0). The VESC's
+wheel odometry is too noisy to drive TF or SLAM, so it is only on `vesc/odom` for diagnostics.
 `require_deadman` is always `true` on the real car: launching with `false` is an error.
 
 | Gamepad | Action |
@@ -129,7 +148,10 @@ First run of a new build or config (docs/DESIGN_PHILOSOPHY.md §6.4), **wheels o
 
 The dev image ships two simulators. Their packages live in `src/base_system/` next to the
 hardware bringup, so they act as drop-in replacements for the real car: both give every car the
-same `scan`, `odom` (map frame), `drive` and `collision` topics and TF frames.
+same `scan`, `odom` (frame `<ns>/odom`), `drive` and `collision` topics and TF frames. Their `odom`
+is ground truth whose origin is the map origin. They also publish `/<ns>/ground_truth/odom` (frame
+`map`) and the track's map as `/ground_truth/map`. RF2O is real-only: it does poorly in the
+feature-poor synthetic worlds.
 
 ### Pure Pursuit demo
 
@@ -192,6 +214,7 @@ ros2 launch rbsf_mvsim mvsim.launch.py
 - MVSim cars take `geometry_msgs/Twist`, so a per-car `mvsim_adapter` converts `/<ns>/drive`
   (Ackermann) to `/<ns>/cmd_vel`, and republishes MVSim's pose, scan and TF in the stack's
   convention. Keyboard teleop works on `/r0/cmd_vel` directly.
-- `/map` is the grid MVSim simulates. Foxglove (same URL and layout as above) shows the map,
+- `/ground_truth/map` is the grid MVSim simulates (the mapping slot republishes it, or its own
+  map, as `/map`). Foxglove (same URL and layout as above) shows the map,
   scans, paths and plots, but not the car models, which come from f1tenth_gym_ros's URDF; MVSim's
   own window shows the cars.
