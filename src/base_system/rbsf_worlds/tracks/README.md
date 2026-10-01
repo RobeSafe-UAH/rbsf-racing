@@ -26,6 +26,11 @@ generated from it by `scripts/tracks/drawn_track.py` (rerun it if the organisers
         src/base_system/rbsf_worlds/tracks/iros2026/iros2026_original.yaml \
         --name iros2026 --start 32.5 8.3 --ccw
 
+Tracks mapped by the car itself are not stored here: `scripts/maps/session_track.py` builds them
+inside the mapping session (`maps/<stamp>/track/`, same file formats) from the SLAM map you pick
+after inspection, and launch files take them as `track:=<path to the yaml>`. Both scripts share
+the corridor and centerline code in `rbsf_worlds/centerline.py`.
+
 The generated map keeps the corridor and fills everything else, with anti-aliased edges: the
 LiDAR sees the same walls, but f1tenth_gym extracts 801 wall segments instead of 5992 and scans
 about 6x faster. The centerline is the zero set of (distance to outer wall - distance to inner

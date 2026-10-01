@@ -84,4 +84,5 @@ def map_saver(robot, platform, track, maps, primary, output_dir):
         package='rbsf_dual_slam', executable='map_saver', namespace=robot, output='screen',
         parameters=[{
             'output_dir': output_dir, 'maps': [f'{n}:{t}' for n, t in maps.items()],
-            'platform': platform, 'track': track, 'primary': primary}])
+            'platform': platform, 'track': track, 'primary': primary,
+            'base_frame': f'{robot}/base_link'}])

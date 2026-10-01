@@ -4,31 +4,41 @@ Save every map of the mapping slot in one session directory, for the offline map
 Runs in the car's namespace (/r0, ...). On a trigger it writes, for each configured map:
 
     <output_dir>/<YYYYMMDD_HHMMSS>/<name>/map.pgm, map.yaml   (nav2 map_server format)
+    <output_dir>/<YYYYMMDD_HHMMSS>/<name>/trajectory.csv      (the car as that SLAM saw it)
+    <output_dir>/<YYYYMMDD_HHMMSS>/ground_truth.csv           (simulators only)
     <output_dir>/<YYYYMMDD_HHMMSS>/session.yaml               (platform, track, primary, maps)
-
-session.yaml gives each map's frame and its pose in `map` (pose_in_map: x, y, yaw from TF), so
-the offline tools can bring the maps into one frame.
 
 and asks the SLAM that built the map to save its own state next to it, so the session can be
 reloaded or reprocessed later: slam_toolbox -> <name>/posegraph.{posegraph,data},
 cartographer -> <name>/map.pbstream. Those native saves run asynchronously and only log their
 result. A failure there never blocks the PGM/YAML save.
 
+session.yaml gives each map's frame and its pose in `map` (pose_in_map: x, y, yaw from TF), so
+the offline tools can bring the maps into one frame. Each trajectory is in its own map's frame
+and comes from that SLAM alone (Cartographer: tracked_pose; others: TF <frame> -> base_frame),
+so it is consistent with its map even when the two SLAMs disagree. The offline tools take the
+driving direction and the start/finish line from it, and check that it stays inside the map's
+free space. Poses are kept every `trajectory_spacing` m of travel.
+
 Subscribes  <map topics>              nav_msgs/OccupancyGrid (transient local; `maps` parameter)
             joy                       sensor_msgs/Joy (rising edge of `save_button`)
-            /tf, /tf_static           map -> <map frames>
+            /tf, /tf_static           map -> <map frames>, <map frames> -> base_frame
+            tracked_pose              geometry_msgs/PoseStamped (Cartographer's own pose)
+            ground_truth/odom         nav_msgs/Odometry (simulators only)
 Services    mapping/save_maps         std_srvs/Trigger (message: the session directory)
 Clients     slam_toolbox/serialize_map  slam_toolbox/SerializePoseGraph (map named slam_toolbox)
             write_state                 cartographer_ros_msgs/WriteState (map named cartographer)
 
 Parameters: output_dir, maps (list of "name:topic"), save_button (-1 disables it), platform,
-track, primary.
+track, primary, base_frame (<robot>/base_link), trajectory_spacing (0.05 m).
 """
 
 import datetime
+import math
 import pathlib
 
-from nav_msgs.msg import OccupancyGrid
+from geometry_msgs.msg import PoseStamped
+from nav_msgs.msg import OccupancyGrid, Odometry
 from rbsf_dual_slam.occupancy import save_map, yaw_from_quaternion
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -42,6 +52,28 @@ import yaml
 
 LATCHED = QoSProfile(
     depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
+
+
+class Trajectory:
+    """Poses (t, x, y, yaw) of one frame, kept every `spacing` m of travel."""
+
+    def __init__(self, spacing):
+        self.spacing = spacing
+        self.poses = []
+
+    def add(self, t, x, y, yaw):
+        if not self.poses or math.dist(self.poses[-1][1:3], (x, y)) >= self.spacing:
+            self.poses.append((t, x, y, yaw))
+
+    def save(self, path, frame):
+        with open(path, 'w') as f:
+            f.write(f'# t_s, x_m, y_m, yaw_rad (frame {frame})\n')
+            for pose in self.poses:
+                f.write(', '.join(f'{v:.4f}' for v in pose) + '\n')
+
+
+def stamp(header):
+    return header.stamp.sec + header.stamp.nanosec * 1e-9
 
 
 def parse_maps(entries):
@@ -67,9 +99,17 @@ class MapSaver(Node):
             'track': self.declare_parameter('track', '').value,
             'primary': self.declare_parameter('primary', '').value,
         }
+        self.base_frame = self.declare_parameter('base_frame', 'base_link').value
+        spacing = self.declare_parameter('trajectory_spacing', 0.05).value
         self.grids = {}
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.trajectories = {name: Trajectory(spacing) for name in self.maps}
+        self.ground_truth = Trajectory(spacing)
+        if 'cartographer' in self.maps:
+            self.create_subscription(PoseStamped, 'tracked_pose', self.tracked_pose_callback, 10)
+        self.create_subscription(Odometry, 'ground_truth/odom', self.ground_truth_callback, 10)
+        self.create_timer(0.1, self.record_tf_poses)
         self.last_button = 0
         for name, topic in self.maps.items():
             self.create_subscription(
@@ -83,6 +123,29 @@ class MapSaver(Node):
             f'{self.output_dir}: joystick button {self.save_button} or '
             f'`ros2 service call {self.resolve_service_name("mapping/save_maps")} '
             'std_srvs/srv/Trigger`')
+
+    def tracked_pose_callback(self, msg):
+        q = msg.pose.orientation
+        self.trajectories['cartographer'].add(
+            stamp(msg.header), msg.pose.position.x, msg.pose.position.y,
+            yaw_from_quaternion(q.x, q.y, q.z, q.w))
+
+    def ground_truth_callback(self, msg):
+        p, q = msg.pose.pose.position, msg.pose.pose.orientation
+        self.ground_truth.add(stamp(msg.header), p.x, p.y, yaw_from_quaternion(q.x, q.y, q.z, q.w))
+
+    def record_tf_poses(self):
+        """Pose of base_frame in each (non-Cartographer) map's frame, from TF."""
+        for name, grid in self.grids.items():
+            if name == 'cartographer':
+                continue
+            try:
+                tf = self.tf_buffer.lookup_transform(grid.header.frame_id, self.base_frame, Time())
+            except TransformException:
+                continue
+            t, r = tf.transform.translation, tf.transform.rotation
+            self.trajectories[name].add(stamp(tf.header), t.x, t.y,
+                                        yaw_from_quaternion(r.x, r.y, r.z, r.w))
 
     def native_clients(self):
         """Service clients for the SLAMs' own state files, if their packages are installed."""
@@ -129,7 +192,12 @@ class MapSaver(Node):
                 'frame': grid.header.frame_id, 'resolution': float(info.resolution),
                 'width': info.width, 'height': info.height, 'origin': list(origin),
                 'pose_in_map': self.pose_in_map(grid.header.frame_id)}
+            self.trajectories[name].save(directory / name / 'trajectory.csv', grid.header.frame_id)
+            session['maps'][name]['trajectory'] = f'{name}/trajectory.csv'
             self.save_native(name, directory / name)
+        if self.ground_truth.poses:
+            self.ground_truth.save(directory / 'ground_truth.csv', 'map')
+            session['ground_truth'] = 'ground_truth.csv'
         if missing:
             session['missing'] = missing
             self.get_logger().warn(f"No map yet from {', '.join(missing)}: not saved")

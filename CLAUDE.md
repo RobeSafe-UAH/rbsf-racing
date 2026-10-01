@@ -171,6 +171,13 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   `map_overlay`). `map_saver` writes nav2-format PGM/YAML per SLAM for the offline map tools.
   Cartographer uses odometry in sim and runs LiDAR-only on the real car (RF2O would count the
   scans twice). Decided 2026-10-01.
+- Offline track generation: the source map is chosen per session, after inspection, because
+  neither SLAM wins on every track (SLAM Toolbox was better on spielberg, Cartographer far better
+  on iros2026). `scripts/maps/session_track.py inspect` runs automated checks (closed corridor,
+  own trajectory inside its own corridor, ground truth in sim) and writes a figure for a human
+  look; `centerline --source <map>` builds the track in `maps/<stamp>/track/` and refuses failed
+  maps without `--force`. It ports the legacy `scripts/centerline` tools: the algorithm lives in
+  `rbsf_worlds/centerline.py`, shared with `scripts/tracks/drawn_track.py`. Decided 2026-10-01.
 - Tracks (maps + reference lines) and world/map tools live in the shared `rbsf_worlds` package;
   simulators and controllers take `track:=<name>`. Reference lines are closed loops ordered in the
   driving direction. Decided 2026-10-01.

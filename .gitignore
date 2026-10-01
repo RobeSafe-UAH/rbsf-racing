@@ -222,4 +222,4 @@ install/
 log/
 
 # Saved maps (rbsf_dual_slam map_saver)
-maps/
+/maps/

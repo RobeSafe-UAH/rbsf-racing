@@ -154,7 +154,7 @@ internals.
 | out | `/map` | `nav_msgs/OccupancyGrid` | Transient local (latched) |
 | out | TF `map -> <ns>/odom` | | SLAM and identity implementations |
 | out | `mapping/<impl>/map` | `nav_msgs/OccupancyGrid` | Secondary SLAM of `dual_slam` (frame `<ns>/<impl>/map`) |
-| service | `mapping/save_maps` | `std_srvs/Trigger` | SLAM implementations. Writes `maps/<stamp>/<impl>/map.{pgm,yaml}` (nav2 format) + native state + `session.yaml` |
+| service | `mapping/save_maps` | `std_srvs/Trigger` | SLAM implementations. Writes `maps/<stamp>/<impl>/map.{pgm,yaml}` (nav2 format), `<impl>/trajectory.csv` (that SLAM's own path), native state, `ground_truth.csv` (simulators) and `session.yaml`. `scripts/maps/session_track.py` turns a session into a track after inspection |
 
 **Localization**
 

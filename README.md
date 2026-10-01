@@ -97,9 +97,33 @@ ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger
   two maps overlay in Foxglove.
 - A save writes `maps/<YYYYMMDD_HHMMSS>/{slam_toolbox,cartographer}/map.{pgm,yaml}` (nav2
   map_server format, the input of the offline map cleaning and centerline tools), each SLAM's
-  own state (`posegraph.*`, `map.pbstream`), and `session.yaml` (platform, track, and each map's
-  frame and pose in `map`). Save after driving a little past the start line, so the end of the
-  lap is in both maps.
+  own state (`posegraph.*`, `map.pbstream`), each SLAM's own trajectory, ground truth on the
+  simulators, and `session.yaml` (platform, track, and each map's frame and pose in `map`). Save
+  after driving a little past the start line, so the end of the lap is in both maps.
+
+#### From a mapping session to a track
+
+Neither SLAM is reliably better (it depends on the track), so the map a track is built from is
+chosen per session, after inspecting both. In the dev container, with the workspace sourced:
+
+```bash
+python3 scripts/maps/session_track.py inspect maps/<stamp>
+#   -> maps/<stamp>/inspection.png (look at it) + inspection.yaml, and a recommended source
+python3 scripts/maps/session_track.py centerline maps/<stamp> --source cartographer
+#   -> maps/<stamp>/track/<track>_<stamp>.{png,yaml}, _centerline.csv, centerline.png
+ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/track/<name>.yaml
+```
+
+- `inspect` checks every map: the cleaned free space must be one closed corridor (an unclosed
+  lap, a doubled wall from a bad loop closure or a large unknown hole fails it), and at least 95%
+  of the SLAM's own trajectory must lie inside its own corridor (a drifted or tangled map fails
+  it). On the simulators it also scores each map and trajectory against ground truth.
+- `centerline` refuses a map that failed inspection unless you pass `--force`. It writes a
+  cleaned map (corridor free, rest occupied) and the centerline in the rbsf_worlds format. The
+  line is ordered in the driving direction and starts where the car started. Both come from the
+  recorded trajectory, and `--ccw/--cw` and `--start X Y` override them. Coordinates are in the
+  source map's frame, so the result is a self-contained track for both simulators and the planners.
+- The algorithm (`rbsf_worlds/centerline.py`) is shared with `scripts/tracks/drawn_track.py`.
 
 - On a track with a reference line, the car follows its outer wall (right on counter-clockwise
   tracks, left on clockwise ones). Gains and distances are in
