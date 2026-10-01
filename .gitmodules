@@ -1,0 +1,4 @@
+[submodule "src/base_system/f1tenth_gym_ros"]
+	path = src/base_system/f1tenth_gym_ros
+	url = https://github.com/f1tenth/f1tenth_gym_ros
+	branch = dev-jazzy

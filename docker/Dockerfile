@@ -3,7 +3,7 @@
 # RBSF Racing images: ROS 2 Jazzy on Ubuntu 24.04.
 #
 # Two flavors share every layer up to the ROS stack dependencies:
-#   dev    workstation: ROS desktop, RViz, MVSim simulator
+#   dev    workstation: ROS desktop, RViz, MVSim and f1tenth_gym simulators
 #   robot  on-board computer: ros-base + drivers, no GUI
 #
 # Caching rules followed here (keep them when editing):
@@ -114,6 +114,34 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         ros-${ROS_DISTRO}-desktop \
         ros-${ROS_DISTRO}-mvsim
 
+# f1tenth_gym (JAX physics) for the f1tenth_gym_ros bridge. It needs NumPy 2, so it lives in
+# its own venv instead of the system interpreter (which stays on numpy<2 for the Jazzy binaries).
+# The venv sees the system ROS packages; only the bridge runs on it (see rbsf_f1tenth_gym).
+# The install is editable because the gym downloads tracks into its own maps/ directory, which is
+# world-writable since the runtime UID is only known when the container starts.
+# Qt/GL libraries are only needed by the gym's own renderer (examples), not by the bridge.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+        libegl1 libgl1 libgl1-mesa-dri libopengl0 libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 \
+        libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxkbcommon-x11-0
+
+ARG F1TENTH_GYM_REF=ec3b1a4693ed20317e42e57a9454d94b824cec81
+# Freezes the resolution of the gym's (unpinned) transitive dependencies.
+ARG F1TENTH_GYM_EXCLUDE_NEWER=2026-10-01T00:00:00Z
+ENV RBSF_GYM_PYTHON=/opt/f1tenth_gym/venv/bin/python3 \
+    JAX_PLATFORMS=cpu
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,from=uv,source=/uv,target=/usr/local/bin/uv \
+    git init -q /opt/f1tenth_gym/src \
+ && git -C /opt/f1tenth_gym/src fetch -q --depth 1 https://github.com/f1tenth/f1tenth_gym.git "$F1TENTH_GYM_REF" \
+ && git -C /opt/f1tenth_gym/src -c advice.detachedHead=false checkout -q FETCH_HEAD \
+ && uv venv -q --system-site-packages --python /usr/bin/python3 /opt/f1tenth_gym/venv \
+ && UV_LINK_MODE=copy uv pip install -q --python /opt/f1tenth_gym/venv/bin/python3 \
+        --exclude-newer "$F1TENTH_GYM_EXCLUDE_NEWER" \
+        -e /opt/f1tenth_gym/src "numpy>=2" \
+ && chmod 1777 /opt/f1tenth_gym/src/maps
+
 # ---------------------------------------------------------------------------
 # manifests: strip src/ down to package.xml files (and colcon ignore markers).
 # This stage re-runs on any source change, but its output only changes when a
@@ -124,6 +152,15 @@ COPY src /tmp/ws/src
 RUN find /tmp/ws/src -mindepth 1 -type f \
         ! -name package.xml ! -name COLCON_IGNORE ! -name AMENT_IGNORE -delete \
  && find /tmp/ws/src -mindepth 1 -type d -empty -delete
+# The robot image carries no simulators: hide their packages from rosdep (it honors COLCON_IGNORE).
+# Simulator packages sit next to the hardware ones in base_system/ as drop-in replacements.
+ARG FLAVOR
+ARG SIM_PACKAGES="f1tenth_gym_ros rbsf_f1tenth_gym"
+RUN if [ "$FLAVOR" = robot ]; then \
+        for pkg in $SIM_PACKAGES; do \
+            find /tmp/ws/src -type d -name "$pkg" -exec touch {}/COLCON_IGNORE \; ; \
+        done; \
+    fi
 
 # ---------------------------------------------------------------------------
 # final: workspace dependencies + runtime glue

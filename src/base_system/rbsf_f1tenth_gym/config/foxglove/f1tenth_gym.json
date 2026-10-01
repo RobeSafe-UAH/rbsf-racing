@@ -1,0 +1,677 @@
+{
+  "configById": {
+    "3D!18i6zy7": {
+      "layers": {
+        "845139cb-26bc-40b3-8161-8ab60af4baf5": {
+          "visible": false,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "845139cb-26bc-40b3-8161-8ab60af4baf5",
+          "layerId": "foxglove.Grid",
+          "size": 10,
+          "divisions": 10,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        },
+        "b663b903-4ddb-4b31-9444-d3ecaa3dacf0": {
+          "displayMode": "visual",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "label": "URDF_r0",
+          "instanceId": "b663b903-4ddb-4b31-9444-d3ecaa3dacf0",
+          "layerId": "foxglove.Urdf",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/r0/robot_description",
+          "framePrefix": "",
+          "order": 2,
+          "fallbackColor": "#ff0000"
+        },
+        "e1031b0e-b009-492a-8910-a9ab5c1016fe": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "e1031b0e-b009-492a-8910-a9ab5c1016fe",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or0",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or0/robot_description",
+          "framePrefix": "",
+          "order": 3
+        },
+        "382e6f83-7912-4c69-8630-285c14850a65": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "382e6f83-7912-4c69-8630-285c14850a65",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or1",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or1/robot_description",
+          "framePrefix": "",
+          "order": 4
+        },
+        "6ccd9716-f098-4bb9-b5bb-7aca6669cc33": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "6ccd9716-f098-4bb9-b5bb-7aca6669cc33",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or2",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or2/robot_description",
+          "framePrefix": "",
+          "order": 5
+        },
+        "8e780760-ca21-4085-8102-3471d3a0ebb6": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "8e780760-ca21-4085-8102-3471d3a0ebb6",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or3",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or3/robot_description",
+          "framePrefix": "",
+          "order": 5
+        },
+        "8360373a-c92b-4382-89f6-294d8a8a03a4": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "8360373a-c92b-4382-89f6-294d8a8a03a4",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or4",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or4/robot_description",
+          "framePrefix": "",
+          "order": 5
+        },
+        "1fbd505c-66a0-4d6c-a7b6-3c5910619bc2": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "1fbd505c-66a0-4d6c-a7b6-3c5910619bc2",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or5",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or5/robot_description",
+          "framePrefix": "",
+          "order": 5
+        },
+        "50de906b-a34c-4a42-b4ca-77167830a4dc": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "50de906b-a34c-4a42-b4ca-77167830a4dc",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or6",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or6/robot_description",
+          "framePrefix": "",
+          "order": 5
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 35.16173831819783,
+        "phi": 5.7304686744168496e-05,
+        "thetaOffset": -0.09321478413203176,
+        "targetOffset": [
+          -1.9671735501319842,
+          5.015656769273419,
+          -4.7876171032030805e-17
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "fixedFrame": "map",
+      "scene": {
+        "ignoreColladaUpAxis": true,
+        "meshUpAxis": "z_up",
+        "transforms": {
+          "visible": false
+        }
+      },
+      "transforms": {
+        "frame:map": {
+          "visible": true
+        }
+      },
+      "topics": {
+        "/map": {
+          "visible": true
+        },
+        "/r0/scan": {
+          "visible": true,
+          "colorField": "range",
+          "colorMode": "gradient",
+          "colorMap": "turbo",
+          "gradient": [
+            "#ec0303ff",
+            "#12fd00ff"
+          ],
+          "pointSize": 5
+        },
+        "/r0/pure_pursuit/path": {
+          "visible": true,
+          "type": "line",
+          "lineWidth": 0.05,
+          "gradient": [
+            "#4e98e2ff",
+            "#4e98e2ff"
+          ]
+        }
+      },
+      "publish": {
+        "type": "pose_estimate",
+        "poseTopic": "/opponents/or0/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/r0/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {},
+      "synchronize": false,
+      "followTf": "map",
+      "foxglovePanelTitle": "Map View"
+    },
+    "RawMessages!14hdtdl": {
+      "defaultExpanded": false,
+      "topicPath": "/r0/lap_count.data",
+      "fontSize": 72,
+      "foxglovePanelTitle": "r0 laps"
+    },
+    "RawMessages!1vck6r8": {
+      "defaultExpanded": false,
+      "topicPath": "/r0/lap_time.data",
+      "fontSize": 72,
+      "foxglovePanelTitle": "r0 last lap (s)"
+    },
+    "3D!3lfrc7e": {
+      "layers": {
+        "845139cb-26bc-40b3-8161-8ab60af4baf5": {
+          "visible": false,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "845139cb-26bc-40b3-8161-8ab60af4baf5",
+          "layerId": "foxglove.Grid",
+          "size": 10,
+          "divisions": 10,
+          "lineWidth": 1,
+          "color": "#248eff",
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "order": 1
+        },
+        "b663b903-4ddb-4b31-9444-d3ecaa3dacf0": {
+          "displayMode": "visual",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "label": "URDF_r0",
+          "instanceId": "b663b903-4ddb-4b31-9444-d3ecaa3dacf0",
+          "layerId": "foxglove.Urdf",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/r0/robot_description",
+          "framePrefix": "",
+          "order": 2,
+          "fallbackColor": "#ff0000"
+        },
+        "e1031b0e-b009-492a-8910-a9ab5c1016fe": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "e1031b0e-b009-492a-8910-a9ab5c1016fe",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or0",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or0/robot_description",
+          "framePrefix": "",
+          "order": 3
+        },
+        "382e6f83-7912-4c69-8630-285c14850a65": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "382e6f83-7912-4c69-8630-285c14850a65",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or1",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or1/robot_description",
+          "framePrefix": "",
+          "order": 4
+        },
+        "6ccd9716-f098-4bb9-b5bb-7aca6669cc33": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "6ccd9716-f098-4bb9-b5bb-7aca6669cc33",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or2",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or2/robot_description",
+          "framePrefix": "",
+          "order": 5
+        },
+        "8e780760-ca21-4085-8102-3471d3a0ebb6": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "8e780760-ca21-4085-8102-3471d3a0ebb6",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or3",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or3/robot_description",
+          "framePrefix": "",
+          "order": 5
+        },
+        "8360373a-c92b-4382-89f6-294d8a8a03a4": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "8360373a-c92b-4382-89f6-294d8a8a03a4",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or4",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or4/robot_description",
+          "framePrefix": "",
+          "order": 5
+        },
+        "1fbd505c-66a0-4d6c-a7b6-3c5910619bc2": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "1fbd505c-66a0-4d6c-a7b6-3c5910619bc2",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or5",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or5/robot_description",
+          "framePrefix": "",
+          "order": 5
+        },
+        "50de906b-a34c-4a42-b4ca-77167830a4dc": {
+          "controlMode": "transforms",
+          "jointStatesTopic": "",
+          "displayMode": "auto",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "instanceId": "50de906b-a34c-4a42-b4ca-77167830a4dc",
+          "layerId": "foxglove.Urdf",
+          "label": "URDF_or6",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/opponents/or6/robot_description",
+          "framePrefix": "",
+          "order": 5
+        }
+      },
+      "cameraState": {
+        "perspective": true,
+        "distance": 3.496492294474609,
+        "phi": 81.37877678260242,
+        "thetaOffset": 90.55269292800844,
+        "targetOffset": [
+          2.075761274359209,
+          -0.0173104397780598,
+          -0.16429034780516677
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "fixedFrame": "map",
+      "scene": {
+        "ignoreColladaUpAxis": true,
+        "meshUpAxis": "z_up",
+        "transforms": {
+          "visible": false
+        }
+      },
+      "transforms": {
+        "frame:map": {
+          "visible": true
+        }
+      },
+      "topics": {
+        "/map": {
+          "visible": true
+        },
+        "/r0/scan": {
+          "visible": true,
+          "colorField": "range",
+          "colorMode": "gradient",
+          "colorMap": "turbo",
+          "gradient": [
+            "#ec0303ff",
+            "#12fd00ff"
+          ],
+          "pointSize": 5
+        },
+        "/r0/pure_pursuit/path": {
+          "visible": true,
+          "type": "line",
+          "lineWidth": 0.05,
+          "gradient": [
+            "#4e98e2ff",
+            "#4e98e2ff"
+          ]
+        }
+      },
+      "publish": {
+        "type": "pose_estimate",
+        "poseTopic": "/opponents/or0/goal_pose",
+        "pointTopic": "/clicked_point",
+        "poseEstimateTopic": "/r0/initialpose",
+        "poseEstimateXDeviation": 0.5,
+        "poseEstimateYDeviation": 0.5,
+        "poseEstimateThetaDeviation": 0.26179939
+      },
+      "imageMode": {},
+      "synchronize": false,
+      "followTf": "r0/base_link",
+      "foxglovePanelTitle": "3rd Person View"
+    },
+    "Plot!speed": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/r0/odom.twist.twist.linear.x",
+          "enabled": true,
+          "color": "#4e98e2",
+          "id": "f34ccfbd-9f96-5c66-8c64-670cfc880890",
+          "label": "r0 speed (m/s)"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/opponents/or0/odom.twist.twist.linear.x",
+          "enabled": true,
+          "color": "#f5774d",
+          "id": "a8d14b5c-de64-5f1f-a1d4-49e774bf07ed",
+          "label": "or0 speed (m/s)"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/opponents/or1/odom.twist.twist.linear.x",
+          "enabled": true,
+          "color": "#f7df71",
+          "id": "eb6c1e94-c664-5f48-81d3-ff3b6d4cb10e",
+          "label": "or1 speed (m/s)"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/opponents/or2/odom.twist.twist.linear.x",
+          "enabled": true,
+          "color": "#5cd6a9",
+          "id": "8d91777a-680c-5ebd-a2ce-a20b51012fe1",
+          "label": "or2 speed (m/s)"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240,
+      "foxglovePanelTitle": "Speed (odom)"
+    },
+    "Plot!steer": {
+      "paths": [
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/r0/drive.drive.steering_angle",
+          "enabled": true,
+          "color": "#4e98e2",
+          "id": "73858088-3af8-5346-947b-a5cceeaf5e9e",
+          "label": "r0 steering cmd (rad)"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/opponents/or0/drive.drive.steering_angle",
+          "enabled": true,
+          "color": "#f5774d",
+          "id": "75cd8102-0bda-5369-b8dc-85e0571bd0e6",
+          "label": "or0 steering cmd (rad)"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/opponents/or1/drive.drive.steering_angle",
+          "enabled": true,
+          "color": "#f7df71",
+          "id": "e34e51a1-733c-5499-b74e-badbd9ffc2de",
+          "label": "or1 steering cmd (rad)"
+        },
+        {
+          "timestampMethod": "receiveTime",
+          "value": "/opponents/or2/drive.drive.steering_angle",
+          "enabled": true,
+          "color": "#5cd6a9",
+          "id": "53d74e6e-13c0-5559-aba1-53c6fb6b6444",
+          "label": "or2 steering cmd (rad)"
+        }
+      ],
+      "showXAxisLabels": true,
+      "showYAxisLabels": true,
+      "showLegend": true,
+      "legendDisplay": "floating",
+      "showPlotValuesInLegend": true,
+      "isSynced": true,
+      "xAxisVal": "timestamp",
+      "sidebarDimension": 240,
+      "foxglovePanelTitle": "Steering command"
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "drawerConfig": {
+    "tracks": []
+  },
+  "layout": {
+    "direction": "row",
+    "first": "3D!18i6zy7",
+    "splitPercentage": 60,
+    "second": {
+      "direction": "column",
+      "splitPercentage": 14,
+      "first": {
+        "direction": "row",
+        "first": "RawMessages!14hdtdl",
+        "second": "RawMessages!1vck6r8",
+        "splitPercentage": 40
+      },
+      "second": {
+        "direction": "column",
+        "splitPercentage": 62,
+        "first": {
+          "direction": "column",
+          "first": "Plot!speed",
+          "second": "Plot!steer"
+        },
+        "second": "3D!3lfrc7e"
+      }
+    }
+  }
+}

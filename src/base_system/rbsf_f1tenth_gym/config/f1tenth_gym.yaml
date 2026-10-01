@@ -1,0 +1,62 @@
+# f1tenth_gym_ros bridge parameters (simulation only).
+# Topic and namespace names are not set here: f1tenth_gym.launch.py derives them from the
+# `robot` launch argument (see rbsf_f1tenth_gym/naming.py).
+f1tenth_gym_bridge:
+  ros__parameters:
+    # LiDAR: Hokuyo UST-10LX as on the car (270 deg, 0.25 deg resolution).
+    lidar_enabled: true
+    lidar_base_link_to_lidar_tf: [0.27, 0.0, 0.0]  # x, y, yaw from base_link (rear axle)
+    lidar_noise_std: 0.01  # m, zero-mean Gaussian
+    scan_num_beams: 1081
+    scan_range_min: 0.06
+    scan_range_max: 30.0
+    scan_angle_min: -135.0  # deg
+    scan_angle_max: 135.0  # deg
+
+    # Track: an rbsf_worlds track (levine, ...), a map yaml path, a path relative to the
+    # f1tenth_gym_ros share directory (maps/levine) or a gym track name (downloaded on first use).
+    # The launch file resolves it to the map yaml path the bridge receives.
+    map_path: 'levine'
+    map_img_ext: '.png'
+
+    # Vehicle model: f1tenth, f1fifth or fullscale.
+    vehicle_params: 'f1tenth'
+    scale: 1.0
+
+    # Cars: the ego plus num_agents - 1 opponents. By default f1tenth_gym.launch.py spawns them
+    # on the track's reference line (spawn_on_line:=true); these poses are only used with
+    # spawn_on_line:=false or on maps without a line. Opponent i (counted from 0) starts at
+    # sx<i+1>/sy<i+1>/stheta<i+1>. They fit the Levine map.
+    num_agents: 1
+    sx: -12.0
+    sy: 0.0
+    stheta: 0.0
+    sx1: -5.5
+    sy1: 0.0
+    stheta1: 0.0
+    sx2: 1.0
+    sy2: 0.0
+    stheta2: 0.0
+    sx3: 8.0
+    sy3: 0.0
+    stheta3: 0.0
+    sx4: -12.0
+    sy4: 8.5
+    stheta4: 3.14
+    sx5: -5.5
+    sy5: 8.5
+    stheta5: 3.14
+    sx6: 1.0
+    sy6: 8.5
+    stheta6: 3.14
+    sx7: 8.0
+    sy7: 8.5
+    stheta7: 3.14
+
+    # Drive the ego with geometry_msgs/Twist on /<robot>/cmd_vel (teleop_twist_keyboard).
+    kb_teleop: true
+
+    # Step on a timer (true) or only when a drive command arrives (false).
+    async_mode: true
+    # Publish /clock and run as fast as possible.
+    use_sim_time_bridge: false
