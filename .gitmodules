@@ -2,3 +2,7 @@
 	path = src/base_system/f1tenth_gym_ros
 	url = https://github.com/f1tenth/f1tenth_gym_ros
 	branch = dev-jazzy
+[submodule "src/base_system/vesc"]
+	path = src/base_system/vesc
+	url = https://github.com/f1tenth/vesc
+	branch = jazzy

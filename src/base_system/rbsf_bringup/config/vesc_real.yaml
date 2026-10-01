@@ -1,0 +1,31 @@
+# VESC parameters for the RobeSafe car (from the RobeSafe-UAH/f1tenth_system fork, vesc.yaml).
+# Shared by vesc_driver_node, ackermann_to_vesc_node and vesc_to_odom_node in the car namespace.
+# Frame names are set by bringup.launch.py from the namespace.
+/**:
+  ros__parameters:
+    # erpm = speed_to_erpm_gain * speed (m/s) + speed_to_erpm_offset
+    speed_to_erpm_gain: 4614.0
+    speed_to_erpm_offset: 0.0
+    # servo (0..1) = steering_angle_to_servo_gain * steering angle (rad) + offset
+    steering_angle_to_servo_gain: -1.2135
+    steering_angle_to_servo_offset: 0.5304
+
+    port: /dev/sensors/vesc
+    duty_cycle_min: 0.0
+    duty_cycle_max: 0.0
+    current_min: 0.0
+    current_max: 100.0
+    brake_min: -20000.0
+    brake_max: 200000.0
+    # Hard motor speed limits (ERPM). 23250 ERPM ~ 5 m/s. drive_gate clips speeds well below.
+    speed_min: -23250.0
+    speed_max: 23250.0
+    position_min: 0.0
+    position_max: 0.0
+    servo_min: 0.15
+    servo_max: 0.85
+
+    # vesc_to_odom
+    publish_tf: true
+    use_servo_cmd_to_calc_angular_velocity: true
+    wheelbase: 0.25
