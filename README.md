@@ -104,6 +104,8 @@ ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger
 
 #### From a mapping session to a track
 
+Step by step for the real car, from bringup to a checked track: [`docs/RACE_DAY.md`](docs/RACE_DAY.md).
+
 Neither SLAM is reliably better (it depends on the track), so the map a track is built from is
 chosen per session, after inspecting both. In the dev container, with the workspace sourced:
 
