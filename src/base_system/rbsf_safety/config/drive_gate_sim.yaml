@@ -1,0 +1,32 @@
+# drive_gate and joystick parameters for the simulators (MVSim, f1tenth_gym). The wildcards
+# apply them in every car namespace (/r0/drive_gate, /r0/joy_node, ...). See docs/DESIGN_PHILOSOPHY.md §6.
+/**/drive_gate:
+  ros__parameters:
+    # require_deadman is set by drive_gate.launch.py (default false on the simulators: auto_cmd
+    # alone drives the car, no joystick needed; a joystick's manual deadman still pre-empts it).
+    # Command rate on `drive` (Hz).
+    rate: 50.0
+    # Seconds without a message before the joystick / auto_cmd counts as lost.
+    joy_timeout: 0.5
+    auto_cmd_timeout: 0.2
+    # Buttons (sensor_msgs/Joy indices). Check them with `ros2 topic echo /r0/joy`.
+    # Defaults: LB = manual deadman, RB = autonomous deadman, START = arm, BACK = disarm.
+    manual_deadman_button: 4
+    auto_deadman_button: 5
+    arm_button: 7
+    disarm_button: 6
+    # Axes for manual driving: left stick vertical (speed), right stick horizontal (steering).
+    speed_axis: 1
+    steering_axis: 3
+    # Limits (m/s, rad). Every command is clipped to them, manual and autonomous.
+    max_manual_speed: 3.0
+    max_auto_speed: 8.0
+    max_steering: 0.4189
+
+/**/joy_node:
+  ros__parameters:
+    device_id: 0
+    deadzone: 0.05
+    # Republish at 20 Hz while nothing changes, so a held stick keeps the joystick alive.
+    autorepeat_rate: 20.0
+    coalesce_interval: 0.01
