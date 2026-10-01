@@ -1,0 +1,34 @@
+# Wall-following parameters for the real car. Start slow and tune on the track. The wildcard applies them to
+# every namespaced instance (/r0/wall_follower, ...).
+/**:
+  ros__parameters:
+    # Wall to follow: 'left' or 'right'. On a track with a reference line the launch file
+    # overrides it with the outer wall (wall_side:=auto); follow the outer wall, so corners show
+    # up as a wall ahead and not as a gap.
+    wall_side: left
+    # Target distance to the wall (m).
+    reference_distance: 0.7
+    # Constant forward speed (m/s). drive_gate clips it to its max_auto_speed.
+    speed: 0.8
+    # Distance PI: steering (rad) per metre of distance error, and its integral term.
+    distance_kp: 1.0
+    distance_ki: 0.0
+    distance_integral_limit: 1.0
+    # Orientation PI: steering (rad) per radian of wall angle, and its integral term.
+    orientation_kp: 1.0
+    orientation_ki: 0.0
+    orientation_integral_limit: 1.0
+    # Ray angles on the wall side (deg from the heading, mirrored for the right wall).
+    lateral_angle: 90.0
+    forward_angle: 60.0
+    # Half-width of the window (deg) whose median range is used for each ray.
+    ray_window: 2.0
+    # Steering limit (rad).
+    max_steering: 0.4189
+    # Gaps: a wall-side hit farther than this (m) means the wall is lost (doorway, side
+    # opening): the car holds its heading.
+    max_wall_distance: 1.5
+    # Corners: below corner_distance (m) of free space ahead, steering blends linearly into full
+    # lock at corner_min_distance: away from the wall side, or towards it if the wall is lost.
+    corner_distance: 1.5
+    corner_min_distance: 0.7
