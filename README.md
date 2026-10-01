@@ -85,6 +85,7 @@ handling) while the mapping slot builds the map. The default mapper is DualSLAM
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=spielberg
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth track:=spielberg
 #   robot:=r0  headless:=true  foxglove:=false  rviz:=false  joy:=false  require_deadman:=true
+#   wall_side:=auto|left|right
 #   mapping:=dual_slam|slam_toolbox|cartographer|identity ... controller:=wall_following
 
 # Save both maps (gamepad Y does the same):
@@ -125,8 +126,10 @@ ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/
   source map's frame, so the result is a self-contained track for both simulators and the planners.
 - The algorithm (`rbsf_worlds/centerline.py`) is shared with `scripts/tracks/drawn_track.py`.
 
-- On a track with a reference line, the car follows its outer wall (right on counter-clockwise
-  tracks, left on clockwise ones). Gains and distances are in
+- With `wall_side:=auto` (default), on a track with a reference line, the car follows its outer
+  wall (right on counter-clockwise tracks, left on clockwise ones). Otherwise it follows the
+  YAML's `wall_side`. `track` defaults to `levine` on the simulators and to none on the real
+  car, so pass `wall_side:=left|right` there. Gains and distances are in
   `src/controller/rbsf_wall_following/config/wall_following_{sim,real}.yaml`.
 - `levine` is a building floor with junctions that lead off the loop: the car explores them.
   Use `iros2026` or `spielberg` for a closed lap.
@@ -136,11 +139,11 @@ ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/
 ### Real car
 
 ```bash
-# Everything on the car
-ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real
+# Everything on the car (follow the outer wall: wall_side:=left|right)
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real wall_side:=left
 # Distributed: same ROS_DOMAIN_ID on both machines (make run ROS_DOMAIN_ID=<n>)
 ros2 launch stack_launcher platform.launch.py platform:=real                                    # car
-ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed  # laptop
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed wall_side:=left  # laptop
 ```
 
 `rbsf_bringup` starts the VESC (`/dev/sensors/vesc`), the Hokuyo (Ethernet, 192.168.0.10), RF2O

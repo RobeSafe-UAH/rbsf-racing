@@ -219,6 +219,13 @@ ros2 launch stack_launcher raceline_tracking.launch.py platform:=f1tenth track:=
   `platform`, `deployment`, `robot`, `track` and one argument per slot (`mapping`,
   `localization`, `perception`, `planning`, `controller`). The behaviour sets the slot
   defaults, and the user can override any of them.
+- `track` defaults per platform (`registry.DEFAULT_TRACK`): `levine` on the simulators, none on
+  `real`. The real car drives an unknown track, and a simulator track would otherwise steer
+  track-dependent options such as `wall_side:=auto`.
+- A behaviour may expose implementation options as extra arguments for one slot
+  (`compose.include_slots(..., extra={slot: {arg: value}})`), e.g. `wall_side` for the
+  controller in `autonomous_exploration`. Only that slot receives them, and an implementation
+  that does not declare one ignores it.
 - A single **registry** in `stack_launcher` maps `slot -> implementation name -> (package, launch
   file)`. Adding an implementation means adding one registry entry, and every behaviour can then
   use it.

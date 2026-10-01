@@ -26,8 +26,20 @@ def include(package, name, arguments):
         launch_arguments={key: str(value) for key, value in arguments.items()}.items())
 
 
-def include_slots(slots, robot, platform, track, use_sim_time):
-    """One include per slot, in SLOTS order, with the component launch contract arguments."""
+def slot_arguments(slot, robot, platform, track, use_sim_time, extra=None):
+    """
+    Launch arguments of one slot: the component contract plus the behaviour's `extra[slot]`.
+
+    Extra arguments are implementation options a behaviour exposes (e.g. the controller's
+    wall_side). An implementation that does not declare one simply ignores it.
+    """
     contract = {'robot': robot, 'platform': platform, 'track': track,
                 'use_sim_time': str(use_sim_time).lower()}
-    return [include(*IMPLEMENTATIONS[slot][slots[slot]], contract) for slot in SLOTS]
+    return {**contract, **(extra or {}).get(slot, {})}
+
+
+def include_slots(slots, robot, platform, track, use_sim_time, extra=None):
+    """One include per slot, in SLOTS order, with the contract and per-slot extra arguments."""
+    return [include(*IMPLEMENTATIONS[slot][slots[slot]],
+                    slot_arguments(slot, robot, platform, track, use_sim_time, extra))
+            for slot in SLOTS]

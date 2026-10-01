@@ -32,9 +32,18 @@ IMPLEMENTATIONS = {
     },
 }
 
+# Track of each platform when the behaviour gets none. The simulators need a world; the real car
+# drives an unknown track (a track there would also steer wall_side:=auto by its reference line).
+DEFAULT_TRACK = {'real': '', 'mvsim': 'levine', 'f1tenth': 'levine'}
+
 # The simulators run in real time and stamp their output with wall time (MVSim's adapter, and the
 # gym bridge unless use_sim_time_bridge is set), so the whole stack uses wall time for now.
 USE_SIM_TIME = {'real': False, 'mvsim': False, 'f1tenth': False}
+
+
+def resolve_track(platform, track):
+    """Return `track` if given, else the platform's default track (none on real)."""
+    return track or DEFAULT_TRACK[platform]
 
 
 def check_choice(kind, value, valid):

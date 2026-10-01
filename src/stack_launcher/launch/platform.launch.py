@@ -22,7 +22,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
 from stack_launcher.compose import include
-from stack_launcher.registry import check_choice, PLATFORMS, USE_SIM_TIME
+from stack_launcher.registry import check_choice, PLATFORMS, resolve_track, USE_SIM_TIME
 
 
 def launch_setup(context):
@@ -30,7 +30,7 @@ def launch_setup(context):
     platform = arg('platform')
     check_choice('platform', platform, PLATFORMS)
     robot = arg('robot').strip('/')
-    track = arg('track')
+    track = resolve_track(platform, arg('track'))
 
     if platform == 'real':
         return [include('rbsf_bringup', 'bringup.launch.py', {
@@ -57,8 +57,8 @@ def generate_launch_description():
             'platform', default_value='mvsim', description=f"One of: {', '.join(PLATFORMS)}."),
         DeclareLaunchArgument('robot', default_value='r0', description='Car namespace.'),
         DeclareLaunchArgument(
-            'track', default_value='levine',
-            description='rbsf_worlds track (simulators only).'),
+            'track', default_value='',
+            description='rbsf_worlds track or map yaml (simulators). Default: levine.'),
         DeclareLaunchArgument(
             'headless', default_value='false', description='MVSim without its window.'),
         DeclareLaunchArgument('rviz', default_value='false', description='RViz (f1tenth).'),

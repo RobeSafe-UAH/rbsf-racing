@@ -1,5 +1,6 @@
 import pytest
-from stack_launcher.registry import IMPLEMENTATIONS, PLATFORMS, SLOTS, USE_SIM_TIME, validate
+from stack_launcher.registry import (
+    DEFAULT_TRACK, IMPLEMENTATIONS, PLATFORMS, resolve_track, SLOTS, USE_SIM_TIME, validate)
 
 VALID = {slot: 'identity' for slot in SLOTS}
 
@@ -34,3 +35,13 @@ def test_invalid_selection_lists_valid_options(platform, deployment, slots, mess
         validate(platform, deployment, slots)
     assert message in str(error.value)
     assert 'Valid options' in str(error.value) or 'Missing' in str(error.value)
+
+
+def test_track_defaults_per_platform():
+    assert set(DEFAULT_TRACK) == set(PLATFORMS)
+    assert resolve_track('mvsim', '') == 'levine'
+    assert resolve_track('f1tenth', '') == 'levine'
+    # The real car drives an unknown track: no simulator track (and its wall side) leaks in.
+    assert resolve_track('real', '') == ''
+    assert resolve_track('real', '/maps/x/track/t.yaml') == '/maps/x/track/t.yaml'
+    assert resolve_track('mvsim', 'iros2026') == 'iros2026'
