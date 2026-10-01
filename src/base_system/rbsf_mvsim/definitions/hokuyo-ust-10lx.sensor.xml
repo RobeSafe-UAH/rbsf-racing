@@ -1,0 +1,18 @@
+<!-- Hokuyo UST-10LX 2D LiDAR (as on the RBSF cars): 270 deg, 0.25 deg resolution, 40 Hz. -->
+<sensor class="laser" name="${sensor_name|scan}">
+    <pose_3d> ${sensor_x|0.27}  ${sensor_y|0.0}  ${sensor_z|0.15}  ${sensor_yaw|0.0} 0.0 0.0</pose_3d>
+    <fov_degrees>${fov_degrees|270}</fov_degrees>
+    <sensor_period>${sensor_period_sec|0.025}</sensor_period>
+    <nrays>${sensor_nrays|1081}</nrays>
+    <range_std_noise>${sensor_std_noise|0.01}</range_std_noise>
+    <angle_std_noise_deg>${sensor_std_noise_deg|0.01}</angle_std_noise_deg>
+    <raytrace_3d>${raytrace_3d|false}</raytrace_3d>
+    <max_range>${max_range|30.0}</max_range>
+    <visual enabled="${sensor_custom_visual|false}"/>
+    <publish enabled="false"/>
+    <viz_visiblePoints>${viz_visiblePoints|true}</viz_visiblePoints>
+    <viz_pointSize>${viz_pointSize|2.0}</viz_pointSize>
+    <viz_visiblePlane>false</viz_visiblePlane>
+    <viz_visibleLines>false</viz_visibleLines>
+    <viz_pointsColor>${viz_pointsColor|#ff000080}</viz_pointsColor>
+</sensor>

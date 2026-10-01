@@ -64,7 +64,8 @@ See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sour
 ## Simulators
 
 The dev image ships two simulators. Their packages live in `src/base_system/` next to the
-hardware bringup, so they act as drop-in replacements for the real car.
+hardware bringup, so they act as drop-in replacements for the real car: both give every car the
+same `scan`, `odom` (map frame), `drive` and `collision` topics and TF frames.
 
 
 ### f1tenth_gym
@@ -92,3 +93,22 @@ ros2 launch rbsf_f1tenth_gym f1tenth_gym.launch.py
 - The gym needs NumPy 2, so the image installs it in its own venv (`/opt/f1tenth_gym/venv`), and
   only the bridge runs on that interpreter. The rest of the stack stays on NumPy 1.x, which the
   Jazzy binaries (e.g. `cv_bridge`) need.
+
+### MVSim
+
+[MVSim](https://github.com/MRPT/mvsim) (`ros-jazzy-mvsim`) through `rbsf_mvsim`:
+
+```bash
+ros2 launch rbsf_mvsim mvsim.launch.py
+#   track:=<rbsf_worlds track>  robot:=r0  headless:=true  foxglove:=false  world_file:=<xml>
+```
+
+- The world is generated at launch: the track's map as an occupancy grid, and F1TENTH cars
+  (`definitions/f1tenth.vehicle.xml`, same wheelbase, steering limit and Hokuyo UST-10LX as the
+  gym) in blue (ego) and orange (opponents).
+- MVSim cars take `geometry_msgs/Twist`, so a per-car `mvsim_adapter` converts `/<ns>/drive`
+  (Ackermann) to `/<ns>/cmd_vel`, and republishes MVSim's pose, scan and TF in the stack's
+  convention. Keyboard teleop works on `/r0/cmd_vel` directly.
+- `/map` is the grid MVSim simulates. Foxglove (same URL and layout as above) shows the map,
+  scans, paths and plots, but not the car models, which come from f1tenth_gym_ros's URDF; MVSim's
+  own window shows the cars.

@@ -1,0 +1,44 @@
+<!--
+  F1TENTH car (1/10 Ackermann) for MVSim, matching the f1tenth_gym model used by the RBSF stack:
+  wheelbase 0.3302 m, steering limit 24 deg (0.4189 rad), origin at the rear axle (base_link).
+  Include it once per colour, giving each a class name:
+    <include file=".../f1tenth.vehicle.xml" class_name="f1tenth_ego" chassis_color="#3080ff"/>
+-->
+<vehicle:class name="${class_name|f1tenth}">
+    <dynamics class="ackermann">
+        <rl_wheel pos="0  0.148" mass="0.2" width="0.045" diameter="0.109"/>
+        <rr_wheel pos="0 -0.148" mass="0.2" width="0.045" diameter="0.109"/>
+        <fl_wheel mass="0.2" width="0.045" diameter="0.109"/>
+        <fr_wheel mass="0.2" width="0.045" diameter="0.109"/>
+        <f_wheels_x>0.3302</f_wheels_x>
+        <f_wheels_d>0.296</f_wheels_d>
+        <max_steer_ang_deg>24.0</max_steer_ang_deg>
+
+        <chassis mass="3.5" zmin="0.03" zmax="0.18" color="${chassis_color|#3080ff}">
+            <shape>
+                <pt> 0.45  0.15</pt>
+                <pt> 0.45 -0.15</pt>
+                <pt>-0.13 -0.15</pt>
+                <pt>-0.13  0.15</pt>
+            </shape>
+        </chassis>
+
+        <!-- Tracks geometry_msgs/Twist on cmd_vel (rbsf_mvsim's ackermann_to_twist feeds it). -->
+        <controller class="twist_front_steer_pid">
+            <KP>15.0</KP>
+            <KI>2.0</KI>
+            <I_MAX>15.0</I_MAX>
+            <KD>0.5</KD>
+            <V>0.0</V>
+            <W>0.0</W>
+            <max_torque>25.0</max_torque>
+        </controller>
+    </dynamics>
+
+    <friction class="default">
+        <mu>1.2</mu>
+        <C_damping>0.002</C_damping>
+    </friction>
+
+    <include file="${MVSIM_CURRENT_FILE_DIRECTORY}/hokuyo-ust-10lx.sensor.xml"/>
+</vehicle:class>

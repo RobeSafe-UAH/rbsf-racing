@@ -155,7 +155,7 @@ RUN find /tmp/ws/src -mindepth 1 -type f \
 # The robot image carries no simulators: hide their packages from rosdep (it honors COLCON_IGNORE).
 # Simulator packages sit next to the hardware ones in base_system/ as drop-in replacements.
 ARG FLAVOR
-ARG SIM_PACKAGES="f1tenth_gym_ros rbsf_f1tenth_gym"
+ARG SIM_PACKAGES="f1tenth_gym_ros rbsf_f1tenth_gym rbsf_mvsim"
 RUN if [ "$FLAVOR" = robot ]; then \
         for pkg in $SIM_PACKAGES; do \
             find /tmp/ws/src -type d -name "$pkg" -exec touch {}/COLCON_IGNORE \; ; \

@@ -1,0 +1,6 @@
+# Per-car MVSim adapter parameters (applies to every namespaced instance).
+/**:
+  ros__parameters:
+    # Must match definitions/f1tenth.vehicle.xml (f_wheels_x) and the LiDAR pose (sensor_x).
+    wheelbase: 0.3302
+    laser_x: 0.27
