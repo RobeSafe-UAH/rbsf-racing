@@ -12,7 +12,21 @@ A yaml may instead name its centerline with a `centerline:` key (path relative t
 |---|---|---|---|
 | `levine` | 61.8 m (centerline) | centerline | f1tenth_gym_ros `maps/levine*` |
 | `spielberg` | 338 m (raceline) | centerline, raceline | f1tenth_gym_ros `maps/Spielberg*` |
+| `iros2026` | 209.4 m (centerline) | centerline | IROS 2026 RoboRacer competition map |
 
-Both come from [f1tenth/f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros) (branch
+`levine` and `spielberg` come from [f1tenth/f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros) (branch
 `dev-jazzy`, commit `f9ad174`), MIT License, Copyright (c) 2020 Hongrui Zheng. Spielberg files
 were renamed to lowercase.
+
+`iros2026` is the IROS 2026 competition map. The organisers' drawing (thin wall lines on white)
+is kept as `iros2026_original.{png,yaml}`; `iros2026.png`, its yaml and the centerline are
+generated from it by `scripts/tracks/drawn_track.py` (rerun it if the organisers update the map):
+
+    python3 scripts/tracks/drawn_track.py \
+        src/base_system/rbsf_worlds/tracks/iros2026/iros2026_original.yaml \
+        --name iros2026 --start 32.5 8.3 --ccw
+
+The generated map keeps the corridor and fills everything else, with anti-aliased edges: the
+LiDAR sees the same walls, but f1tenth_gym extracts 801 wall segments instead of 5992 and scans
+about 6x faster. The centerline is the zero set of (distance to outer wall - distance to inner
+wall), driven counter-clockwise from the bottom straight; the corridor is 1.7-3.5 m wide.

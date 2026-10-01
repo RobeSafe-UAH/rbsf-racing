@@ -58,6 +58,7 @@ Inside each namespace: `scan` (`sensor_msgs/LaserScan`), `odom` (`nav_msgs/Odome
 |---|---|---|
 | `levine` | 61.8 m | centerline |
 | `spielberg` | 338 m | centerline, raceline (with speed profile) |
+| `iros2026` | 209.4 m | centerline |
 
 See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sources.
 
@@ -66,7 +67,6 @@ See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sour
 The dev image ships two simulators. Their packages live in `src/base_system/` next to the
 hardware bringup, so they act as drop-in replacements for the real car: both give every car the
 same `scan`, `odom` (map frame), `drive` and `collision` topics and TF frames.
-
 
 ### Pure Pursuit demo
 
