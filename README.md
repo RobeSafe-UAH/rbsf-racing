@@ -56,10 +56,10 @@ to the mapping slot (a SLAM, or the identity when there is none).
 `src/base_system/rbsf_worlds` holds the tracks every simulator (and later the car) uses: a ROS map
 (yaml + image) plus the reference lines to drive on. Both simulators take `track:=<name>`.
 
-| Track | Length | Lines |
+| Track | Length (centerline) | Lines |
 |---|---|---|
 | `levine` | 61.8 m | centerline |
-| `spielberg` | 338 m | centerline, raceline (with speed profile) |
+| `spielberg` | 343.3 m | centerline, raceline (338.1 m, with speed profile) |
 | `iros2026` | 209.4 m | centerline |
 
 See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sources.

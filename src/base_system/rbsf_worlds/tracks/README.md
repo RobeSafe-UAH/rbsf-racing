@@ -11,7 +11,7 @@ A yaml may instead name its centerline with a `centerline:` key (path relative t
 | Track | Length | Lines | Source |
 |---|---|---|---|
 | `levine` | 61.8 m (centerline) | centerline | f1tenth_gym_ros `maps/levine*` |
-| `spielberg` | 338 m (raceline) | centerline, raceline | f1tenth_gym_ros `maps/Spielberg*` |
+| `spielberg` | 343.3 m (centerline), 338.1 m (raceline) | centerline, raceline | f1tenth_gym_ros `maps/Spielberg*` |
 | `iros2026` | 209.4 m (centerline) | centerline | IROS 2026 RoboRacer competition map |
 
 `levine` and `spielberg` come from [f1tenth/f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros) (branch
