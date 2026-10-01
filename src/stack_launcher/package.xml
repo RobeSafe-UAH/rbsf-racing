@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>stack_launcher</name>
+  <version>0.1.0</version>
+  <description>Behaviours (apps) of the RBSF Racing stack: compose a platform, a deployment and one implementation per functional slot.</description>
+  <maintainer email="santimontieleu@gmail.com">santimontiel</maintainer>
+  <license>Apache-2.0</license>
+
+  <!-- Simulator packages (rbsf_mvsim, rbsf_f1tenth_gym) and rbsf_bringup are looked up at
+       runtime, never declared here: the robot image hides the simulators from rosdep. -->
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rbsf_identity</exec_depend>
+  <exec_depend>rbsf_safety</exec_depend>
+  <exec_depend>rbsf_wall_following</exec_depend>
+
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
