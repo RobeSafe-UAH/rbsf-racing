@@ -29,7 +29,7 @@ from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction, Shutd
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from rbsf_mvsim.world import opponent_namespace, world_xml
+from rbsf_mvsim.world import opponent_namespace, outline_map, world_xml
 from rbsf_worlds.paths import load_waypoints, pose_at
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
 
@@ -55,9 +55,11 @@ def launch_setup(context):
             x, y, yaw = pose_at(load_waypoints(find_waypoints(map_yaml))[0], 0.0)
         except FileNotFoundError:
             x = y = yaw = 0.0
-        world_file = str(pathlib.Path(tempfile.mkdtemp(prefix='rbsf_mvsim_')) / 'world.xml')
+        out_dir = pathlib.Path(tempfile.mkdtemp(prefix='rbsf_mvsim_'))
+        world_file = str(out_dir / 'world.xml')
         with open(world_file, 'w') as f:
-            f.write(world_xml(map_yaml, [(robot, x, y, yaw, 'ego')], follow=robot))
+            f.write(world_xml(outline_map(map_yaml, out_dir), [(robot, x, y, yaw, 'ego')],
+                              follow=robot))
 
     mvsim = Node(
         package='mvsim',

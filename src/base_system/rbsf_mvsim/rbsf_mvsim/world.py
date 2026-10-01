@@ -4,13 +4,21 @@ MVSim world generation for the RBSF tracks.
 MVSim defines the vehicles and their start poses inside the world file, so launch files build it
 on the fly: the track's ROS map yaml as an occupancy grid (walls for the LiDAR and collisions) and
 one F1TENTH car per entry in `cars`, blue for the ego and orange for opponents.
+
+MVSim's 2D LiDAR misses most walls of maps whose whole outside is occupied (e.g. iros2026, filled
+for f1tenth_gym): rays return max range and the car only finds the wall by hitting it. Launch
+files therefore give MVSim outline_map(), which keeps only the occupied cells next to free space.
 """
 
 import math
 import os
+import pathlib
 import xml.etree.ElementTree as ET
 
 from ament_index_python.packages import get_package_share_directory
+import numpy as np
+from PIL import Image
+import yaml
 
 OPP_NAMESPACE_PREFIX = 'opponents/or'
 VEHICLE_CLASSES = {'ego': ('f1tenth_ego', '#3080ff'), 'opponent': ('f1tenth_opp', '#ff9020')}
@@ -19,6 +27,46 @@ VEHICLE_CLASSES = {'ego': ('f1tenth_ego', '#3080ff'), 'opponent': ('f1tenth_opp'
 def opponent_namespace(index):
     """Vehicle name and ROS namespace of opponent `index`, counted from 0 (as in the gym)."""
     return f'{OPP_NAMESPACE_PREFIX}{index}'
+
+
+def occupied_cells(image, negate, occupied_thresh):
+    """Occupied mask of a ROS map image (uint8), with map_server's trinary interpretation."""
+    occupancy = image / 255.0 if negate else (255 - image.astype(np.float64)) / 255.0
+    return occupancy > occupied_thresh
+
+
+def outline(occupied, thickness_px):
+    """Occupied cells within `thickness_px` cells (4-connected) of a free cell."""
+    near_free = ~occupied
+    for _ in range(thickness_px):
+        grown = near_free.copy()
+        grown[1:] |= near_free[:-1]
+        grown[:-1] |= near_free[1:]
+        grown[:, 1:] |= near_free[:, :-1]
+        grown[:, :-1] |= near_free[:, 1:]
+        near_free = grown
+    return occupied & near_free
+
+
+def outline_map(map_yaml, out_dir, thickness=0.2):
+    """
+    Write an outline copy of a ROS map (walls `thickness` m thick, rest free) to `out_dir`.
+
+    Returns the path of the new map yaml. Maps drawn with thin walls come out the same.
+    """
+    map_yaml = pathlib.Path(map_yaml)
+    with open(map_yaml) as f:
+        spec = yaml.safe_load(f)
+    image = np.array(Image.open(map_yaml.parent / spec['image']).convert('L'))
+    occupied = occupied_cells(image, int(spec.get('negate', 0)), spec['occupied_thresh'])
+    walls = outline(occupied, max(1, math.ceil(thickness / spec['resolution'])))
+    out_dir = pathlib.Path(out_dir)
+    stem = f'{map_yaml.stem}_outline'
+    Image.fromarray(np.where(walls, 0, 255).astype(np.uint8)).save(out_dir / f'{stem}.png')
+    spec.update(image=f'{stem}.png', negate=0)
+    with open(out_dir / f'{stem}.yaml', 'w') as f:
+        yaml.safe_dump(spec, f)
+    return str(out_dir / f'{stem}.yaml')
 
 
 def world_xml(map_yaml, cars, follow=None, definitions_dir=None):
