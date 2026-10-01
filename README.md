@@ -68,6 +68,25 @@ hardware bringup, so they act as drop-in replacements for the real car: both giv
 same `scan`, `odom` (map frame), `drive` and `collision` topics and TF frames.
 
 
+### Pure Pursuit demo
+
+Every car follows the track's raceline (or its centerline when there is none) with
+`rbsf_pure_pursuit`, spawned `spacing` metres apart along it with the ego last. All cars set off
+together `start_delay` seconds after launch. The same command works on both simulators:
+
+```bash
+ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py                       # Levine, centerline, 2 m/s
+ros2 launch rbsf_f1tenth_gym pure_pursuit_demo.launch.py track:=spielberg  # raceline x 0.6
+#   num_opponents:=3  spacing:=5.0  speed:=2.0  speed_scale:=0.6  line:=auto|raceline|centerline
+#   ego_driver:=false  start_delay:=5.0
+```
+
+With `ego_driver:=false` the ego is yours to drive (opponents will lap it if it stops). Pure
+Pursuit has no obstacle avoidance, so cars only keep their gaps at equal speeds. On MVSim, Spielberg's
+raceline (which passes 0.25 m from the walls at its apexes) makes the cars graze a few walls; use
+`line:=centerline speed:=3.0` there for a contact-free run. Its gains are in
+`src/controller/rbsf_pure_pursuit/config/pure_pursuit_sim.yaml`.
+
 ### f1tenth_gym
 
 [`f1tenth_gym_ros`](https://github.com/f1tenth/f1tenth_gym_ros) (branch `dev-jazzy`, submodule)
