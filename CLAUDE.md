@@ -24,6 +24,14 @@ iRoboCity Summer School. The legacy repo is the functional reference, not a temp
 When porting a component, read its legacy implementation and the matching `docs/*.md` in the
 legacy repo first. Then rewrite it to this repo's conventions.
 
+## Architecture
+
+Read `docs/DESIGN_PHILOSOPHY.md` before adding a package or launch file. In short: apps are
+behaviours in `stack_launcher`, defined by `platform:=real|mvsim|f1tenth`,
+`deployment:=local|distributed` and one implementation per functional slot (mapping,
+localization, perception, planning, controller), with identity implementations for unused slots.
+Every command to the actuators goes through `drive_gate` (`rbsf_safety`).
+
 ## Legacy architecture (reference)
 
 ROS 2 Humble (Ubuntu 22.04) colcon workspace. All packages are `ament_python`.
@@ -87,6 +95,8 @@ editing the Dockerfile:
   the venv on `PATH`/`PYTHONPATH`.
 - Simulator-only packages are listed in the Dockerfile's `SIM_PACKAGES` so the robot image skips
   their rosdep keys. Add new simulator packages there (`rbsf_worlds` is not simulator-only).
+  Never declare them as dependencies of non-simulator packages (`stack_launcher` looks them up
+  at runtime), or rosdep fails on the robot image.
 - MVSim only takes `Twist` on `cmd_vel`, publishes `odom` relative to the start pose and a
   per-vehicle `/<ns>/tf` with unprefixed frames. `rbsf_mvsim/launch/mvsim.launch.py` remaps those
   to `/<ns>/mvsim/*` and its `mvsim_adapter` node restores the stack convention. Worlds are
@@ -123,11 +133,16 @@ editing the Dockerfile:
 exploration behaviour (reactive wall following + simultaneous SLAM mapping, legacy
 `02_autonomous_slam`) on both MVSim and the real car. Status:
 - [x] Docker images, Makefile, entrypoint (Jazzy / Ubuntu 24.04)
-- [ ] Platform drivers for Jazzy (`f1tenth_system` fork: VESC, ackermann_mux, joy teleop)
-- [ ] Hardware bringup and MVSim simulation packages
-- [ ] Wall-following controller
-- [ ] SLAM Toolbox integration and map saving
-- [ ] Top-level launchers with `mode:=real|mvsim|distributed`
+- [x] Platform drivers for Jazzy (`f1tenth/vesc` jazzy submodule; `drive_gate` replaces
+  ackermann_mux and joy_teleop)
+- [x] Hardware bringup (`rbsf_bringup`) and MVSim simulation packages. The real car is not
+  tested yet.
+- [x] Wall-following controller (`rbsf_wall_following`), verified in MVSim and f1tenth_gym
+- [x] Safety gate (`rbsf_safety` / `drive_gate`), verified in sim
+- [ ] SLAM Toolbox integration and map saving (mapping slot)
+- [x] Top-level launchers (`stack_launcher`) with `platform:=real|mvsim|f1tenth`,
+  `deployment:=local|distributed`
+- [ ] Real-car validation (design doc §6.4 checklist, then wall-following gains)
 
 ## Decisions
 
@@ -141,9 +156,19 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   simulators and controllers take `track:=<name>`. Reference lines are closed loops ordered in the
   driving direction. Decided 2026-10-01.
 
+- Architecture (see `docs/DESIGN_PHILOSOPHY.md`). Decided 2026-10-01:
+  - Five functional slots, swapped at launch level (no plugin framework). Every app fills all
+    five slots, using identity implementations for the ones it does not need.
+  - Behaviours live in `stack_launcher` and take `platform:=real|mvsim|f1tenth` and
+    `deployment:=local|distributed`. These replace the legacy `mode`.
+  - Mapping owns SLAM. Exactly one component publishes `map -> <ns>/odom`.
+  - Safety is `drive_gate` in its own `rbsf_safety` package, on the car side. It fails closed,
+    and autonomous motion on `real` always requires the deadman.
+
 ## Open decisions
 
 Confirm these with the user before assuming:
 - Whether performance-critical nodes move to C++ (`ament_cmake`).
+- The rest of `docs/DESIGN_PHILOSOPHY.md` §9 (`rbsf_msgs` types, runtime orchestrator, VESC brake).
 
 Move each item to **Decisions** once it is settled.

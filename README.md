@@ -6,8 +6,8 @@ RobeSafe Racing Stack for RoboRacer Autonomous Racing
 Requires git and Docker (with BuildKit, Docker 23+). Add the NVIDIA Container Toolkit for GPU
 access. Nothing else is installed on the host.
 
-Third-party ROS packages (such as `f1tenth_gym_ros`) are git submodules under `src/`, so clone
-with `--recurse-submodules`:
+Third-party ROS packages (`f1tenth_gym_ros`, and `vesc` for the real car's motor controller) are
+git submodules under `src/`, so clone with `--recurse-submodules`:
 
 ```bash
 git clone --recurse-submodules https://github.com/RobeSafe-UAH/rbsf-racing.git
@@ -61,6 +61,69 @@ Inside each namespace: `scan` (`sensor_msgs/LaserScan`), `odom` (`nav_msgs/Odome
 | `iros2026` | 209.4 m | centerline |
 
 See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sources.
+
+## Apps
+
+The stack is split into five interchangeable functional slots (mapping, localization,
+perception, planning, controller) that behaviours in `stack_launcher` compose into apps, on any
+platform (`real`, `mvsim`, `f1tenth`) and deployment (`local`, `distributed`). See
+[`docs/DESIGN_PHILOSOPHY.md`](docs/DESIGN_PHILOSOPHY.md).
+
+Every command to the motors goes through `drive_gate` (`rbsf_safety`), the only publisher on
+`/<ns>/drive`. It fails closed: any lost signal stops the car, and a second publisher on `drive`
+shuts the whole stack down. Its state is on `/<ns>/drive_gate/state`.
+
+### Autonomous exploration
+
+The car follows a wall (`rbsf_wall_following`, PI on two LiDAR rays, with gap and corner
+handling) while the mapping slot builds the map (identity for now; SLAM comes next).
+
+```bash
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=iros2026
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth track:=spielberg
+#   robot:=r0  headless:=true  foxglove:=false  rviz:=false  joy:=false  require_deadman:=true
+#   mapping:=identity ... controller:=wall_following
+```
+
+- On a track with a reference line, the car follows its outer wall (right on counter-clockwise
+  tracks, left on clockwise ones). Gains and distances are in
+  `src/controller/rbsf_wall_following/config/wall_following_{sim,real}.yaml`.
+- `levine` is a building floor with junctions that lead off the loop: the car explores them.
+  Use `iros2026` or `spielberg` for a closed lap.
+- In simulation the car drives without a joystick (`require_deadman` defaults to `false`). With
+  a gamepad plugged in, LB + sticks takes over at any time.
+
+### Real car
+
+```bash
+# Everything on the car
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real
+# Distributed: same ROS_DOMAIN_ID on both machines (make run ROS_DOMAIN_ID=<n>)
+ros2 launch stack_launcher platform.launch.py platform:=real                                    # car
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed  # laptop
+```
+
+`rbsf_bringup` starts the VESC (`/dev/sensors/vesc`), the Hokuyo (Ethernet, 192.168.0.10), the
+joystick (`/dev/input/js0`, pair a Bluetooth gamepad on the host first) and `drive_gate`.
+`require_deadman` is always `true` on the real car: launching with `false` is an error.
+
+| Gamepad | Action |
+|---|---|
+| START (7) | Arm autonomy (only while RB is released) |
+| BACK (6) | Disarm |
+| RB (5), held | Autonomous driving. Release = stop |
+| LB (4), held | Manual driving: left stick speed, right stick steering. Always wins |
+
+Indices are in `src/base_system/rbsf_safety/config/drive_gate_real.yaml`. Check them for your
+gamepad with `ros2 topic echo /r0/joy`. A joystick timeout (0.5 s) disarms, and a stale command
+from the controller (0.2 s, e.g. network loss in distributed mode) stops the car.
+
+First run of a new build or config (docs/DESIGN_PHILOSOPHY.md §6.4), **wheels off the ground**:
+1. Start the platform side. `drive_gate/state` must say `STOPPED` / `NO_JOY`.
+2. Connect the gamepad: `DISARMED`. Drive manually with LB.
+3. Start the app, arm with START, hold RB: the wheels turn. Release RB: they stop at once.
+4. In distributed mode, cut the network while holding RB: the car must stop
+   (`AUTO_CMD_TIMEOUT`).
 
 ## Simulators
 
@@ -122,7 +185,8 @@ ros2 launch rbsf_mvsim mvsim.launch.py
 #   track:=<rbsf_worlds track>  robot:=r0  headless:=true  foxglove:=false  world_file:=<xml>
 ```
 
-- The world is generated at launch: the track's map as an occupancy grid, and F1TENTH cars
+- The world is generated at launch: the track's map as an occupancy grid (outline copy: MVSim's
+  LiDAR misses walls of maps filled solid outside the track), and F1TENTH cars
   (`definitions/f1tenth.vehicle.xml`, same wheelbase, steering limit and Hokuyo UST-10LX as the
   gym) in blue (ego) and orange (opponents).
 - MVSim cars take `geometry_msgs/Twist`, so a per-car `mvsim_adapter` converts `/<ns>/drive`
