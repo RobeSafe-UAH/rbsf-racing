@@ -4,7 +4,7 @@ Demo: every car follows the track's raceline/centerline with Pure Pursuit, on MV
 Same demo as rbsf_f1tenth_gym's pure_pursuit_demo.launch.py, with MVSim as the simulator: spawns
 the ego (/<robot>) and `num_opponents` opponents (/opponents/or<i>) on the reference line,
 `spacing` metres apart along it (ego last), and starts one rbsf_pure_pursuit node per car in its
-namespace (odom -> drive). See mvsim.launch.py for the topics.
+namespace (ground_truth/odom -> drive). See mvsim.launch.py for the topics.
 
 The reference line is <track>_raceline.csv when the track has one (speed profile x speed_scale),
 else its centerline (constant `speed`). With ego_driver:=false the ego is left to you.
@@ -55,6 +55,12 @@ def launch_setup(context):
             'foxglove': LaunchConfiguration('foxglove'),
         }.items(),
     )
+    # Identity mapping for the ego: /map from the ground truth, map -> <robot>/odom identity.
+    mapping = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+            get_package_share_directory('rbsf_identity'), 'launch', 'mapping.launch.py')),
+        launch_arguments={'robot': robot, 'platform': 'mvsim'}.items(),
+    )
     pure_pursuit_config = os.path.join(
         get_package_share_directory('rbsf_pure_pursuit'), 'config', 'pure_pursuit_sim.yaml')
     overrides = {
@@ -67,13 +73,15 @@ def launch_setup(context):
     }
     drivers = [
         Node(package='rbsf_pure_pursuit', executable='pure_pursuit', namespace=name,
-             parameters=[pure_pursuit_config, overrides])
+             parameters=[pure_pursuit_config, overrides],
+             remappings=[('odom', 'ground_truth/odom')])  # the line is in the map frame
         for name in (names if arg('ego_driver').lower() == 'true' else names[1:])
     ]
     return [
         LogInfo(msg=f'Pure Pursuit demo (MVSim): {len(names)} cars, {spacing} m apart on '
                     f'{waypoints} ({length:.1f} m)'),
         sim,
+        mapping,
         *drivers,
     ]
 

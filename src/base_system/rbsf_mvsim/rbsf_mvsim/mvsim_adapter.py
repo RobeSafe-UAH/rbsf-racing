@@ -3,15 +3,18 @@ Adapter between one MVSim vehicle and the RBSF car interface (same topics as f1t
 
 Runs inside the car's namespace (/r0, /opponents/or0, ...). mvsim.launch.py remaps MVSim's own
 odom/scan/tf for the vehicle to mvsim/*, and this node republishes them in the stack convention:
-poses in the map frame, TF frames prefixed with the namespace.
+TF frames prefixed with the namespace, and `odom` in the `<ns>/odom` frame. The simulator's
+odometry is ground truth whose `<ns>/odom` origin is the map origin, so `map -> <ns>/odom` is
+the identity unless a SLAM mapper estimates it (docs/DESIGN_PHILOSOPHY.md §3.1).
 
 Subscribes  drive                    ackermann_msgs/AckermannDriveStamped
             base_pose_ground_truth   nav_msgs/Odometry (MVSim, pose in world coordinates)
             mvsim/scan               sensor_msgs/LaserScan (MVSim, frame 'scan')
 Publishes   cmd_vel                  geometry_msgs/Twist (MVSim's vehicle controller input)
-            odom                     nav_msgs/Odometry (frame map, child <ns>/base_link)
+            odom                     nav_msgs/Odometry (frame <ns>/odom, child <ns>/base_link)
+            ground_truth/odom        nav_msgs/Odometry (frame map, child <ns>/base_link)
             scan                     sensor_msgs/LaserScan (frame <ns>/laser)
-            /tf                      map -> <ns>/base_link
+            /tf                      <ns>/odom -> <ns>/base_link
             /tf_static               <ns>/base_link -> <ns>/laser
 
 Ackermann to Twist: MVSim's front-steer controller tracks (v, w), and the bicycle model with
@@ -45,9 +48,11 @@ class MvsimAdapter(Node):
         prefix = self.get_namespace().strip('/')
         self.base_frame = f'{prefix}/base_link' if prefix else 'base_link'
         self.laser_frame = f'{prefix}/laser' if prefix else 'laser'
+        self.odom_frame = f'{prefix}/odom' if prefix else 'odom'
 
         self.cmd_pub = self.create_publisher(Twist, 'cmd_vel', 10)
         self.odom_pub = self.create_publisher(Odometry, 'odom', 10)
+        self.ground_truth_pub = self.create_publisher(Odometry, 'ground_truth/odom', 10)
         self.scan_pub = self.create_publisher(LaserScan, 'scan', 10)
         self.tf_broadcaster = TransformBroadcaster(self)
         self.publish_laser_tf()
@@ -76,6 +81,8 @@ class MvsimAdapter(Node):
     def pose_callback(self, msg):
         msg.header.frame_id = 'map'
         msg.child_frame_id = self.base_frame
+        self.ground_truth_pub.publish(msg)
+        msg.header.frame_id = self.odom_frame
         self.odom_pub.publish(msg)
         tf = TransformStamped()
         tf.header = msg.header

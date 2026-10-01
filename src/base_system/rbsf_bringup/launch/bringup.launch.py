@@ -1,5 +1,5 @@
 """
-Real-car bringup: VESC, Hokuyo LiDAR, joystick and drive_gate, all in /<robot>.
+Real-car bringup: VESC, Hokuyo LiDAR, RF2O laser odometry, joystick and drive_gate, in /<robot>.
 
 This is the platform side of platform:=real (docs/DESIGN_PHILOSOPHY.md §3.1). It always includes
 rbsf_safety's drive_gate: there is no way to start the motor drivers without the gate.
@@ -7,17 +7,23 @@ rbsf_safety's drive_gate: there is no way to start the motor drivers without the
     Subscribes  /<robot>/drive                 ackermann_msgs/AckermannDriveStamped
                                                (ackermann_to_vesc; only drive_gate publishes it)
     Publishes   /<robot>/scan                  sensor_msgs/LaserScan (frame <robot>/laser)
-                /<robot>/odom                  nav_msgs/Odometry (wheel odometry, frame
+                /<robot>/odom                  nav_msgs/Odometry (RF2O laser odometry, frame
                                                <robot>/odom, child <robot>/base_link)
+                /<robot>/vesc/odom             nav_msgs/Odometry (VESC wheel odometry,
+                                               diagnostics only: no TF)
                 /<robot>/joy                   sensor_msgs/Joy
                 /<robot>/drive_gate/state      std_msgs/String
-                /tf                            <robot>/odom -> <robot>/base_link
+                /tf                            <robot>/odom -> <robot>/base_link (RF2O)
                 /tf_static                     <robot>/base_link -> <robot>/laser
     Takes       /<robot>/drive_gate/auto_cmd   (from the controller slot, local or remote)
 
 Devices: the VESC on /dev/sensors/vesc (udev rule on the host), the Hokuyo on Ethernet
 (192.168.0.10) and the joystick on /dev/input/js0. Parameters: config/vesc_real.yaml,
-config/urg_real.yaml, rbsf_safety/config/drive_gate_real.yaml.
+config/urg_real.yaml, config/rf2o_real.yaml, rbsf_safety/config/drive_gate_real.yaml.
+
+Odometry is LiDAR-first: `odom` and its TF come from RF2O (rf2o_laser_odometry, vendored in
+src/base_system). The VESC's odometry (wheel speed + servo command) is too noisy to drive TF or
+SLAM, so it is kept on vesc/odom for diagnostics only.
 """
 
 import os
@@ -45,6 +51,7 @@ def launch_setup(context):
     share = get_package_share_directory('rbsf_bringup')
     vesc_config = os.path.join(share, 'config', 'vesc_real.yaml')
     urg_config = os.path.join(share, 'config', 'urg_real.yaml')
+    rf2o_config = os.path.join(share, 'config', 'rf2o_real.yaml')
 
     def node(package, executable, **kwargs):
         return Node(package=package, executable=executable, namespace=robot, output='screen',
@@ -58,7 +65,12 @@ def launch_setup(context):
         node('vesc_ackermann', 'ackermann_to_vesc_node', parameters=[vesc_config],
              remappings=[('ackermann_cmd', 'drive')]),
         node('vesc_ackermann', 'vesc_to_odom_node', parameters=[vesc_config, {
-            'odom_frame': odom_frame, 'base_frame': base_frame}]),
+            'odom_frame': odom_frame, 'base_frame': base_frame, 'publish_tf': False}],
+             remappings=[('odom', 'vesc/odom')]),
+        node('rf2o_laser_odometry', 'rf2o_laser_odometry_node', name='rf2o_laser_odometry',
+             parameters=[rf2o_config, {
+                 'laser_scan_topic': 'scan', 'odom_topic': 'odom', 'publish_tf': True,
+                 'odom_frame_id': odom_frame, 'base_frame_id': base_frame}]),
         node('urg_node', 'urg_node_driver', parameters=[urg_config, {
             'laser_frame_id': laser_frame}]),
         node('tf2_ros', 'static_transform_publisher', arguments=[

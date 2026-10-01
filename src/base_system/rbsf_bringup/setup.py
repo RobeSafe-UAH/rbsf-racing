@@ -18,7 +18,7 @@ setup(
     zip_safe=True,
     maintainer='santimontiel',
     maintainer_email='santimontieleu@gmail.com',
-    description='Real-car bringup: VESC, Hokuyo, joystick and drive_gate.',
+    description='Real-car bringup: VESC, Hokuyo, RF2O laser odometry, joystick and drive_gate.',
     license='Apache-2.0',
     tests_require=['pytest'],
 )

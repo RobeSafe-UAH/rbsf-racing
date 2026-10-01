@@ -1,0 +1,6 @@
+# RF2O laser odometry on the real car (LiDAR-first odometry, see bringup.launch.py).
+# Topics and frames are set by bringup.launch.py from the namespace.
+/**:
+  ros__parameters:
+    # Start at the origin of <robot>/odom (no ground-truth pose on the car).
+    init_pose_from_topic: ''

@@ -25,7 +25,6 @@
     servo_min: 0.15
     servo_max: 0.85
 
-    # vesc_to_odom
-    publish_tf: true
+    # vesc_to_odom (vesc/odom, diagnostics only; publish_tf is forced false by bringup.launch.py)
     use_servo_cmd_to_calc_angular_velocity: true
     wheelbase: 0.25

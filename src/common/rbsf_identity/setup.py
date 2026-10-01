@@ -22,6 +22,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'map_relay = rbsf_identity.map_relay:main',
             'odom_relay = rbsf_identity.odom_relay:main',
         ],
     },

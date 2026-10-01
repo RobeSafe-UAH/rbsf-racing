@@ -1,5 +1,9 @@
-from rbsf_f1tenth_gym.gym_bridge import opp_suffix
-from rbsf_f1tenth_gym.naming import bridge_parameters, bridge_remappings, opponent_namespace
+from types import SimpleNamespace
+
+from rbsf_f1tenth_gym.gym_bridge import OdomParentBroadcaster, opp_suffix
+from rbsf_f1tenth_gym.naming import (
+    bridge_parameters, bridge_remappings, ground_truth_odom_topic, odom_frame,
+    opponent_namespace)
 
 
 def test_opponents_are_numbered_from_zero():
@@ -26,3 +30,22 @@ def test_remappings_move_global_topics_into_namespaces():
     assert remappings['/goal_pose1'] == '/opponents/or1/goal_pose'
     assert remappings['/r0/opp_odom0'] == '/r0/opponents/or0/odom'
     assert not any('or2' in target for target in remappings.values())
+
+
+def test_odom_frames_follow_namespace():
+    assert odom_frame('r0') == 'r0/odom'
+    assert odom_frame('opponents/or1') == 'opponents/or1/odom'
+    assert ground_truth_odom_topic('opponents/or0') == '/opponents/or0/ground_truth/odom'
+
+
+def transform(parent, child):
+    return SimpleNamespace(header=SimpleNamespace(frame_id=parent), child_frame_id=child)
+
+
+def test_base_link_is_reparented_to_odom():
+    sent = []
+    broadcaster = OdomParentBroadcaster(SimpleNamespace(sendTransform=sent.append))
+    broadcaster.sendTransform(transform('map', 'r0/base_link'))
+    broadcaster.sendTransform(transform('map', 'opponents/or0/base_link'))
+    broadcaster.sendTransform(transform('r0/base_link', 'r0/laser'))  # untouched
+    assert [t.header.frame_id for t in sent] == ['r0/odom', 'opponents/or0/odom', 'r0/base_link']

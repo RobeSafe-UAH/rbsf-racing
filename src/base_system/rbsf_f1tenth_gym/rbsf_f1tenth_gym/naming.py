@@ -3,7 +3,7 @@ Topic and namespace layout of the f1tenth_gym simulation.
 
 The ego car lives under /<robot> (r0, r1, ... as the real cars) and opponent i under
 /opponents/or<i>, numbered from 0. TF frames follow the namespaces (r0/base_link,
-opponents/or0/laser, ...).
+opponents/or0/laser, ...), and odometry is in each car's <ns>/odom frame.
 
 f1tenth_gym_ros builds part of each opponent's names from a suffix (see gym_bridge.py in this
 package, which numbers it from 0); the rest are global topics that bridge_remappings() moves into
@@ -16,6 +16,16 @@ OPP_NAMESPACE_PREFIX = 'opponents/or'
 def opponent_namespace(index):
     """Namespace (without leading slash) of opponent `index`, counted from 0."""
     return f'{OPP_NAMESPACE_PREFIX}{index}'
+
+
+def odom_frame(namespace):
+    """Odometry frame of the car in `namespace` (`<ns>/odom`)."""
+    return f'{namespace}/odom'
+
+
+def ground_truth_odom_topic(namespace):
+    """Absolute ground-truth odometry topic of the car in `namespace`."""
+    return f'/{namespace}/ground_truth/odom'
 
 
 def bridge_parameters(robot):

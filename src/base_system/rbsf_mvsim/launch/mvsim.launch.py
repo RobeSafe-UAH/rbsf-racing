@@ -5,12 +5,15 @@ Per car (<ns> = <robot> for the ego, opponents/or<i> for opponent i):
     Subscribes  /<ns>/drive                    ackermann_msgs/AckermannDriveStamped
                 /<ns>/cmd_vel                  geometry_msgs/Twist (direct MVSim input, teleop)
     Publishes   /<ns>/scan                     sensor_msgs/LaserScan (frame <ns>/laser)
-                /<ns>/odom                     nav_msgs/Odometry (map frame, child <ns>/base_link)
+                /<ns>/odom                     nav_msgs/Odometry (<ns>/odom frame, child
+                                               <ns>/base_link)
+                /<ns>/ground_truth/odom        nav_msgs/Odometry (map frame, child <ns>/base_link)
                 /<ns>/collision                std_msgs/Bool
                 /<ns>/base_pose_ground_truth   nav_msgs/Odometry (MVSim)
 Global:
-    /map (nav_msgs/OccupancyGrid, the grid MVSim simulates), /tf (map -> <ns>/base_link ->
-    <ns>/laser), /clock (MVSim).
+    /ground_truth/map (nav_msgs/OccupancyGrid, the grid MVSim simulates; the mapping slot owns
+    /map), /tf (<ns>/odom -> <ns>/base_link -> <ns>/laser), /tf_static (map ->
+    opponents/or<i>/odom, identity: opponents are part of the world), /clock (MVSim).
 
 mvsim_node runs every vehicle; its own odom/scan/tf topics are remapped to /<ns>/mvsim/* and one
 rbsf_mvsim mvsim_adapter per car turns them into the topics above (see mvsim_adapter.py).
@@ -35,8 +38,9 @@ from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
 
 
 def mvsim_remappings(namespaces):
-    """Move each vehicle's MVSim odom/scan/tf under /<ns>/mvsim/, and publish the grid as /map."""
-    remappings = [('/simul_map', '/map'), ('/simul_map_metadata', '/map_metadata')]
+    """Move each vehicle's MVSim odom/scan/tf under /<ns>/mvsim/; the grid is /ground_truth/map."""
+    remappings = [('/simul_map', '/ground_truth/map'),
+                  ('/simul_map_metadata', '/ground_truth/map_metadata')]
     for ns in namespaces:
         remappings += [(f'/{ns}/{topic}', f'/{ns}/mvsim/{topic}')
                        for topic in ('odom', 'scan', 'tf', 'tf_static')]
@@ -68,7 +72,7 @@ def launch_setup(context):
             'world_file': world_file,
             'headless': arg('headless').lower() == 'true',
             'force_publish_vehicle_namespace': True,
-            # The adapters publish map -> <ns>/base_link; MVSim's per-vehicle tf is unused.
+            # The adapters publish <ns>/odom -> <ns>/base_link; MVSim's per-vehicle tf is unused.
             'do_fake_localization': False,
             'publish_tf_odom2baselink': False,
         }],
@@ -83,6 +87,12 @@ def launch_setup(context):
              parameters=[adapter_config])
         for ns in namespaces
     ]
+    # The ego's map -> <ns>/odom belongs to its mapping slot; opponents' odom is ground truth.
+    opponent_odom_tfs = [
+        Node(package='tf2_ros', executable='static_transform_publisher', name='map_to_odom',
+             namespace=ns, arguments=['--frame-id', 'map', '--child-frame-id', f'{ns}/odom'])
+        for ns in namespaces[1:]
+    ]
     port = arg('foxglove_port')
     foxglove = Node(
         package='foxglove_bridge',
@@ -92,7 +102,7 @@ def launch_setup(context):
     )
     return [
         LogInfo(msg=f'MVSim world: {world_file}'),
-        mvsim, *adapters, foxglove,
+        mvsim, *adapters, *opponent_odom_tfs, foxglove,
         LogInfo(msg=f'Foxglove: https://app.foxglove.dev/?ds=foxglove-websocket'
                     f'&ds.url=ws://localhost:{port}',
                 condition=IfCondition(LaunchConfiguration('foxglove'))),

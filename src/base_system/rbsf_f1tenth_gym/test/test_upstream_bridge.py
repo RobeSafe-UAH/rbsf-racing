@@ -1,9 +1,9 @@
 """
 Canary for the f1tenth_gym_ros internals that rbsf_f1tenth_gym relies on.
 
-gym_bridge.py replaces upstream's opp_suffix() and naming.py remaps the global topics upstream
-builds with it. If upstream renames or restructures any of this, these checks fail before the
-simulation silently publishes under the wrong names.
+gym_bridge.py replaces upstream's opp_suffix() and re-frames its odometry, and naming.py
+remaps the global topics upstream builds with the suffix. If upstream renames or restructures
+any of this, these checks fail before the simulation silently publishes under the wrong names.
 """
 
 import importlib.util
@@ -33,4 +33,20 @@ def upstream_source():
     "'/cmd_vel'",
 ])
 def test_upstream_naming_is_unchanged(upstream_source, snippet):
+    assert snippet in upstream_source
+
+
+# gym_bridge.patch_odom_frames() wraps these methods and relies on the map-frame values they set.
+@pytest.mark.parametrize('snippet', [
+    'def _make_odom_msg(self, ts, namespace, pose, speed):',
+    "odom.header.frame_id = 'map'",
+    'def _publish_odom(self, ts):',
+    'def _publish_transforms(self, ts):',
+    "ts_msg.header.frame_id = 'map'",
+    "ts_msg.child_frame_id = namespace + '/base_link'",
+    'self.br.sendTransform(ts_msg)',
+    'self.ego_speed = ',
+    'self.speed = ',
+])
+def test_upstream_odometry_is_unchanged(upstream_source, snippet):
     assert snippet in upstream_source

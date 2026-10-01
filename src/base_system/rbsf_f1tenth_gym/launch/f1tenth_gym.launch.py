@@ -20,8 +20,12 @@ Opponent i (<ns> = opponents/or<i>):
     Publishes   /<ns>/scan, /<ns>/odom, /<ns>/ego_odom, /<ns>/collision, /<ns>/lap_count,
                 /<ns>/lap_time, /<ns>/robot_description
 Global:
-    /map (nav_msgs/OccupancyGrid), /tf (map -> <ns>/base_link -> <ns>/laser), /pause_sim
-    (std_msgs/Bool), /clock (if use_sim_time_bridge).
+    /ground_truth/map (nav_msgs/OccupancyGrid; the mapping slot owns /map), /tf
+    (<ns>/odom -> <ns>/base_link -> <ns>/laser), /tf_static (map -> opponents/or<i>/odom,
+    identity: opponents are part of the world), /pause_sim (std_msgs/Bool), /clock (if
+    use_sim_time_bridge).
+Every car also publishes /<ns>/ground_truth/odom (frame map). Its odom is the same pose in the
+<ns>/odom frame, whose origin is the map origin (see gym_bridge.py).
 
 f1tenth_gym needs NumPy 2, so the image installs it in its own venv (RBSF_GYM_PYTHON). The bridge
 is the only process started with that interpreter; everything else runs on the system one.
@@ -93,6 +97,17 @@ def robot_state_publisher(namespace, accent_color, vehicle, use_sim_time):
     )
 
 
+def opponent_odom_tf(namespace):
+    """Identity map -> <ns>/odom for an opponent: its odometry is ground truth."""
+    return Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='map_to_odom',
+        namespace=namespace,
+        arguments=['--frame-id', 'map', '--child-frame-id', f'{namespace}/odom'],
+    )
+
+
 def launch_setup(context):
     gym_python = os.environ.get('RBSF_GYM_PYTHON', '')
     if not os.access(gym_python, os.X_OK):
@@ -135,7 +150,8 @@ def launch_setup(context):
     map_server = Node(
         package='nav2_map_server',
         executable='map_server',
-        parameters=[{'yaml_filename': scaled_yaml, 'topic_name': 'map', 'frame_id': 'map',
+        parameters=[{'yaml_filename': scaled_yaml, 'topic_name': '/ground_truth/map',
+                     'frame_id': 'map',
                      'use_sim_time': use_sim_time}],
     )
     lifecycle_manager = Node(
@@ -165,8 +181,9 @@ def launch_setup(context):
         condition=IfCondition(LaunchConfiguration('rviz')),
         output='log',
     )
+    opponent_odom_tfs = [opponent_odom_tf(opponent_namespace(i)) for i in range(num_agents - 1)]
     return [
-        bridge, map_server, lifecycle_manager, *models, foxglove, rviz,
+        bridge, map_server, lifecycle_manager, *models, *opponent_odom_tfs, foxglove, rviz,
         LogInfo(msg=f'Foxglove: {foxglove_url} (layout: rbsf_f1tenth_gym/config/foxglove/)',
                 condition=IfCondition(LaunchConfiguration('foxglove'))),
     ]

@@ -1,5 +1,7 @@
 """
-Identity localization: relay /<robot>/odom to /<robot>/localization/odom (odom_relay).
+Identity localization: /<robot>/odom placed in the map frame by TF (odom_relay).
+
+Publishes /<robot>/localization/odom.
 
 Follows the component launch contract (docs/DESIGN_PHILOSOPHY.md §4.2).
 """

@@ -3,7 +3,7 @@
 <package format="3">
   <name>rbsf_bringup</name>
   <version>0.1.0</version>
-  <description>Real-car bringup of the RBSF Racing stack: VESC, Hokuyo LiDAR, joystick and drive_gate.</description>
+  <description>Real-car bringup of the RBSF Racing stack: VESC, Hokuyo LiDAR, RF2O laser odometry, joystick and drive_gate.</description>
   <maintainer email="santimontieleu@gmail.com">santimontiel</maintainer>
   <license>Apache-2.0</license>
 
@@ -11,6 +11,7 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>rbsf_safety</exec_depend>
+  <exec_depend>rf2o_laser_odometry</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>urg_node</exec_depend>
   <exec_depend>vesc_ackermann</exec_depend>
