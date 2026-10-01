@@ -1,0 +1,9 @@
+# The build context is the repo root, but the image only needs these paths.
+# Source code is never copied into the image (it is mounted at runtime); src/
+# is sent only so the build can extract package.xml files for rosdep.
+*
+!docker/
+!src/
+!pyproject.toml
+!uv.lock
+**/__pycache__

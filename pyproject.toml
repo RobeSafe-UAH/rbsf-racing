@@ -1,0 +1,16 @@
+[project]
+name = "rbsf-racing"
+version = "0.1.0"
+description = "RobeSafe Racing Stack for RoboRacer Autonomous Racing"
+authors = [{ name = "The RobeSafe Racing Team" }]
+license = "Apache-2.0"
+# Must match the system interpreter of the ROS distro (Jazzy / Ubuntu 24.04).
+requires-python = ">=3.12,<3.13"
+# Only Python packages that apt/rosdep cannot provide. Prefer rosdep keys in
+# package.xml (python3-numpy, python3-opencv, ...) so versions match the ROS build.
+dependencies = []
+
+[tool.uv]
+package = false
+# ROS Jazzy binaries (cv_bridge, tf_transformations, ...) are built against NumPy 1.x.
+constraint-dependencies = ["numpy<2"]
