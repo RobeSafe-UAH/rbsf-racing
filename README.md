@@ -7,22 +7,21 @@ Requires git and Docker (with BuildKit, Docker 23+). Add the NVIDIA Container To
 access. Nothing else is installed on the host.
 
 Third-party ROS packages (`f1tenth_gym_ros`, and `vesc` for the real car's motor controller) are
-git submodules under `src/`, so clone with `--recurse-submodules`:
+git submodules under `src/`. Clone the `dev` branch (day-to-day work; `main` holds stable
+releases) with `--recurse-submodules` to also download its submodules:
 
 ```bash
-git clone --recurse-submodules https://github.com/RobeSafe-UAH/rbsf-racing.git
+git clone --branch dev --recurse-submodules https://github.com/RobeSafe-UAH/rbsf-racing.git
 cd rbsf-racing
-git switch dev    # day-to-day work; main holds stable releases
 ```
 
-If you already cloned without it, or after pulling changes that add or move a submodule:
+After switching branches or pulling changes, or if you cloned without `--recurse-submodules`,
+update the submodules before building:
 
 ```bash
+git submodule sync --recursive
 git submodule update --init --recursive
 ```
-
-To have `git pull` keep submodules in sync automatically, run
-`git config submodule.recurse true` once in the repo.
 
 Then build the image and start the container:
 
