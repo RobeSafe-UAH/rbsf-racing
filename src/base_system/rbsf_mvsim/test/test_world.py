@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 from PIL import Image
 import pytest
-from rbsf_mvsim.mvsim_adapter import ackermann_to_twist
+from rbsf_mvsim.mvsim_adapter import ackermann_to_twist, wheel_quaternion
 from rbsf_mvsim.world import occupied_cells, opponent_namespace, outline, outline_map, world_xml
 import yaml
 
@@ -66,3 +66,11 @@ def test_ackermann_to_twist_is_the_bicycle_model():
     # Turning radius R = L / tan(delta), and w = v / R.
     assert w == pytest.approx(2.0 / (0.33 / math.tan(0.3)))
     assert ackermann_to_twist(-1.0, 0.3, 0.33)[1] < 0.0  # reversing turns the other way
+
+
+def test_wheel_quaternion_is_a_unit_steer_then_roll():
+    assert wheel_quaternion(0.0, 0.0) == (0.0, 0.0, 0.0, 1.0)
+    x, y, z, w = wheel_quaternion(0.4, 1.0)
+    assert x * x + y * y + z * z + w * w == pytest.approx(1.0)
+    assert wheel_quaternion(0.4, 0.0)[2] == pytest.approx(math.sin(0.2))  # pure steer: about z
+    assert wheel_quaternion(0.0, 1.0)[1] == pytest.approx(math.sin(0.5))  # pure roll: about y

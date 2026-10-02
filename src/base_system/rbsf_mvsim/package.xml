@@ -9,6 +9,7 @@
 
   <exec_depend>ackermann_msgs</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>f1tenth_gym_ros</exec_depend>
   <exec_depend>foxglove_bridge</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
@@ -22,8 +23,10 @@
   <exec_depend>rbsf_pure_pursuit</exec_depend>
   <exec_depend>rbsf_worlds</exec_depend>
   <exec_depend>rclpy</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>xacro</exec_depend>
 
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>

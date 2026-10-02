@@ -10,6 +10,7 @@ Per car (<ns> = <robot> for the ego, opponents/or<i> for opponent i):
                 /<ns>/ground_truth/odom        nav_msgs/Odometry (map frame, child <ns>/base_link)
                 /<ns>/collision                std_msgs/Bool
                 /<ns>/base_pose_ground_truth   nav_msgs/Odometry (MVSim)
+                /<ns>/robot_description    std_msgs/String (f1tenth_gym car model, RViz/Foxglove)
 Global:
     /ground_truth/map (nav_msgs/OccupancyGrid, the grid MVSim simulates; the mapping slot owns
     /map), /tf (<ns>/odom -> <ns>/base_link -> <ns>/laser), /tf_static (map ->
@@ -30,8 +31,9 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction, Shutdown
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from rbsf_mvsim.world import opponent_namespace, outline_map, world_xml
 from rbsf_worlds.paths import load_waypoints, pose_at
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
@@ -45,6 +47,22 @@ def mvsim_remappings(namespaces):
         remappings += [(f'/{ns}/{topic}', f'/{ns}/mvsim/{topic}')
                        for topic in ('odom', 'scan', 'tf', 'tf_static')]
     return remappings
+
+
+EGO_ACCENT_COLOR = '0.3 0.57 1.0 1.0'
+OPP_ACCENT_COLOR = '1.0 0.57 0.1 1.0'
+
+
+def robot_state_publisher(namespace, accent_color):
+    """Publish the f1tenth_gym car model (same URDF and colours) for one car."""
+    xacro_file = os.path.join(
+        get_package_share_directory('f1tenth_gym_ros'), 'urdf', 'racecar_mesh.xacro')
+    # value_type=str: the URDF must not be yaml-parsed. Quoted: the colour has spaces.
+    description = ParameterValue(Command([
+        'xacro ', xacro_file, ' car_name:=', namespace, ' accent_color:="', accent_color, '"']),
+        value_type=str)
+    return Node(package='robot_state_publisher', executable='robot_state_publisher',
+                namespace=namespace, parameters=[{'robot_description': description}])
 
 
 def launch_setup(context):
@@ -63,7 +81,7 @@ def launch_setup(context):
         world_file = str(out_dir / 'world.xml')
         with open(world_file, 'w') as f:
             f.write(world_xml(outline_map(map_yaml, out_dir), [(robot, x, y, yaw, 'ego')],
-                              follow=robot))
+                              follow=robot, work_dir=out_dir))
 
     mvsim = Node(
         package='mvsim',
@@ -93,6 +111,8 @@ def launch_setup(context):
              namespace=ns, arguments=['--frame-id', 'map', '--child-frame-id', f'{ns}/odom'])
         for ns in namespaces[1:]
     ]
+    models = [robot_state_publisher(ns, EGO_ACCENT_COLOR if ns == robot else OPP_ACCENT_COLOR)
+              for ns in namespaces]
     port = arg('foxglove_port')
     foxglove = Node(
         package='foxglove_bridge',
@@ -102,7 +122,7 @@ def launch_setup(context):
     )
     return [
         LogInfo(msg=f'MVSim world: {world_file}'),
-        mvsim, *adapters, *opponent_odom_tfs, foxglove,
+        mvsim, *adapters, *models, *opponent_odom_tfs, foxglove,
         LogInfo(msg=f'Foxglove: https://app.foxglove.dev/?ds=foxglove-websocket'
                     f'&ds.url=ws://localhost:{port}',
                 condition=IfCondition(LaunchConfiguration('foxglove'))),

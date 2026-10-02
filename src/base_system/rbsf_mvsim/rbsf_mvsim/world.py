@@ -3,7 +3,8 @@ MVSim world generation for the RBSF tracks.
 
 MVSim defines the vehicles and their start poses inside the world file, so launch files build it
 on the fly: the track's ROS map yaml as an occupancy grid (walls for the LiDAR and collisions) and
-one F1TENTH car per entry in `cars`, blue for the ego and orange for opponents.
+one F1TENTH car per entry in `cars`, blue for the ego and orange for opponents, with the car
+model RViz shows for f1tenth_gym.
 
 MVSim's 2D LiDAR misses most walls of maps whose whole outside is occupied (e.g. iros2026, filled
 for f1tenth_gym): rays return max range and the car only finds the wall by hitting it. Launch
@@ -13,6 +14,8 @@ files therefore give MVSim outline_map(), which keeps only the occupied cells ne
 import math
 import os
 import pathlib
+import shutil
+import tempfile
 import xml.etree.ElementTree as ET
 
 from ament_index_python.packages import get_package_share_directory
@@ -69,14 +72,20 @@ def outline_map(map_yaml, out_dir, thickness=0.2):
     return str(out_dir / f'{stem}.yaml')
 
 
-def world_xml(map_yaml, cars, follow=None, definitions_dir=None):
+def world_xml(map_yaml, cars, follow=None, definitions_dir=None, meshes_dir=None,
+              work_dir=None):
     """
     Return an MVSim world XML string.
 
     map_yaml: absolute path of a ROS map yaml. cars: (name, x, y, yaw_rad, kind) tuples with
     kind 'ego' or 'opponent'; the name is also the ROS namespace (r0, opponents/or0, ...).
-    follow: vehicle the GUI camera follows.
+    follow: vehicle the GUI camera follows. meshes_dir: the car model's meshes (default: the
+    ones of f1tenth_gym_ros, which RViz shows with f1tenth_gym). work_dir: where the per-class
+    copies of the accent mesh go (MVSim tints a mesh once per file, not once per vehicle).
     """
+    if meshes_dir is None:
+        meshes_dir = os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'meshes')
+    work_dir = pathlib.Path(work_dir or tempfile.mkdtemp(prefix='rbsf_mvsim_'))
     if definitions_dir is None:
         definitions_dir = os.path.join(get_package_share_directory('rbsf_mvsim'), 'definitions')
     world = ET.Element('mvsim_world', version='1.0')
@@ -93,8 +102,10 @@ def world_xml(map_yaml, cars, follow=None, definitions_dir=None):
 
     vehicle_file = os.path.join(definitions_dir, 'f1tenth.vehicle.xml')
     for class_name, color in VEHICLE_CLASSES.values():
+        accent = work_dir / f'{class_name}_accent.stl'
+        shutil.copy(os.path.join(meshes_dir, 'roboracer_accent.stl'), accent)
         ET.SubElement(world, 'include', file=vehicle_file, class_name=class_name,
-                      chassis_color=color)
+                      chassis_color=color, meshes_dir=str(meshes_dir), accent_mesh=str(accent))
     for name, x, y, yaw, kind in cars:
         vehicle = ET.SubElement(world, 'vehicle', name=name, **{'class': VEHICLE_CLASSES[kind][0]})
         ET.SubElement(vehicle, 'init_pose').text = f'{x:.4f} {y:.4f} {math.degrees(yaw):.2f}'

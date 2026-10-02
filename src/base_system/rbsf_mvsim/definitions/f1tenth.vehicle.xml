@@ -2,14 +2,59 @@
   F1TENTH car (1/10 Ackermann) for MVSim, matching the f1tenth_gym model used by the RBSF stack:
   wheelbase 0.3302 m, steering limit 24 deg (0.4189 rad), origin at the rear axle (base_link).
   Include it once per colour, giving each a class name:
-    <include file=".../f1tenth.vehicle.xml" class_name="f1tenth_ego" chassis_color="#3080ff"/>
+    <include file=".../f1tenth.vehicle.xml" class_name="f1tenth_ego" chassis_color="#3080ff"
+             meshes_dir=".../f1tenth_gym_ros/meshes"
+             accent_mesh="/tmp/f1tenth_ego_accent.stl"/>
+  The 3D model is the one RViz shows with f1tenth_gym (urdf/racecar_mesh.xacro): meshes_dir holds
+  its meshes. Their frame is the rear axle, like the vehicle's. The wheel meshes are offset to
+  where the xacro puts the hubs across the car (y only: an offset along x would orbit the hub as
+  the wheel spins) and tilted by its per-wheel alignment (the meshes carry a slight
+  camber and toe that would wobble when spinning), and turn with the physical wheels.
+  MVSim shares a mesh between the vehicles that load the same file, so each class gets its own
+  copy of the accent mesh (accent_mesh) to be tinted with its own chassis_color.
 -->
 <vehicle:class name="${class_name|f1tenth}">
     <dynamics class="ackermann">
-        <rl_wheel pos="0  0.148" mass="0.2" width="0.045" diameter="0.109"/>
-        <rr_wheel pos="0 -0.148" mass="0.2" width="0.045" diameter="0.109"/>
-        <fl_wheel mass="0.2" width="0.045" diameter="0.109"/>
-        <fr_wheel mass="0.2" width="0.045" diameter="0.109"/>
+        <rl_wheel pos="0  0.148" mass="0.2" width="0.045" diameter="0.109">
+            <visual>
+                <model_uri>${meshes_dir}/roboracer_wheel_rear_left.glb</model_uri>
+                <model_roll>-2.543</model_roll>
+                <model_pitch>-0.005</model_pitch>
+                <model_yaw>-0.246</model_yaw>
+                <model_offset_x>0</model_offset_x>
+                <model_offset_y>-0.0172</model_offset_y>
+            </visual>
+        </rl_wheel>
+        <rr_wheel pos="0 -0.148" mass="0.2" width="0.045" diameter="0.109">
+            <visual>
+                <model_uri>${meshes_dir}/roboracer_wheel_rear_right.glb</model_uri>
+                <model_roll>2.932</model_roll>
+                <model_pitch>0.007</model_pitch>
+                <model_yaw>-0.29</model_yaw>
+                <model_offset_x>0</model_offset_x>
+                <model_offset_y>0.0161</model_offset_y>
+            </visual>
+        </rr_wheel>
+        <fl_wheel mass="0.2" width="0.045" diameter="0.109">
+            <visual>
+                <model_uri>${meshes_dir}/roboracer_wheel_front_left.glb</model_uri>
+                <model_roll>-3.574</model_roll>
+                <model_pitch>0.068</model_pitch>
+                <model_yaw>2.177</model_yaw>
+                <model_offset_x>0</model_offset_x>
+                <model_offset_y>-0.0151</model_offset_y>
+            </visual>
+        </fl_wheel>
+        <fr_wheel mass="0.2" width="0.045" diameter="0.109">
+            <visual>
+                <model_uri>${meshes_dir}/roboracer_wheel_front_right.glb</model_uri>
+                <model_roll>1.899</model_roll>
+                <model_pitch>-0.046</model_pitch>
+                <model_yaw>2.803</model_yaw>
+                <model_offset_x>0</model_offset_x>
+                <model_offset_y>0.0164</model_offset_y>
+            </visual>
+        </fr_wheel>
         <f_wheels_x>0.3302</f_wheels_x>
         <f_wheels_d>0.296</f_wheels_d>
         <max_steer_ang_deg>24.0</max_steer_ang_deg>
@@ -34,6 +79,21 @@
             <max_torque>25.0</max_torque>
         </controller>
     </dynamics>
+
+    <!-- Sprung mass of the car: chassis, accent (tinted per class) and LiDAR -->
+    <visual>
+        <model_uri>${meshes_dir}/roboracer_chassis.glb</model_uri>
+    </visual>
+    <visual>
+        <model_uri>${accent_mesh}</model_uri>
+        <model_color>${chassis_color|#3080ff}</model_color>
+    </visual>
+    <visual>
+        <model_uri>${meshes_dir}/roboracer_lidar.glb</model_uri>
+        <model_offset_x>0.2670</model_offset_x>
+        <model_offset_y>0.0002</model_offset_y>
+        <model_offset_z>0.1216</model_offset_z>
+    </visual>
 
     <friction class="default">
         <mu>1.2</mu>
