@@ -223,3 +223,6 @@ log/
 
 # Saved maps (rbsf_dual_slam map_saver)
 /maps/
+
+# Local test outputs (plots, reports)
+/outputs/
