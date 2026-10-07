@@ -20,7 +20,7 @@ mvsim_node runs every vehicle; its own odom/scan/tf topics are remapped to /<ns>
 rbsf_mvsim mvsim_adapter per car turns them into the topics above (see mvsim_adapter.py).
 
 Without world_file, the world is generated from `track` with the ego alone, at the start of the
-track's reference line.
+track's reference line. The track's cones (rbsf_worlds/cones.py) are drawn into the grid.
 """
 
 import os
@@ -35,6 +35,7 @@ from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from rbsf_mvsim.world import opponent_namespace, outline_map, world_xml
+from rbsf_worlds.cones import with_cones
 from rbsf_worlds.paths import load_waypoints, pose_at
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
 
@@ -80,7 +81,8 @@ def launch_setup(context):
         out_dir = pathlib.Path(tempfile.mkdtemp(prefix='rbsf_mvsim_'))
         world_file = str(out_dir / 'world.xml')
         with open(world_file, 'w') as f:
-            f.write(world_xml(outline_map(map_yaml, out_dir), [(robot, x, y, yaw, 'ego')],
+            grid = outline_map(with_cones(map_yaml, out_dir), out_dir)
+            f.write(world_xml(grid, [(robot, x, y, yaw, 'ego')],
                               follow=robot, work_dir=out_dir))
 
     mvsim = Node(

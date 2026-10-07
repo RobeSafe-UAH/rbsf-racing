@@ -5,3 +5,11 @@ negate: 0
 occupied_thresh: 0.65
 free_thresh: 0.196
 centerline: levine_centerline.csv
+# Cone rows [x0, y0, x1, y1] (m) closing the openings off the lap, along the loop's own walls
+# (see rbsf_worlds/cones.py): the annex with the open corridor (right), the dead end below it,
+# and the corridor on the left, above and below the loop.
+cones:
+  - [10.6, -1.05, 10.6, 2.1]
+  - [8.9, -1.05, 10.6, -1.05]
+  - [-14.5, 9.5, -12.8, 9.5]
+  - [-14.5, -1.0, -12.8, -1.0]

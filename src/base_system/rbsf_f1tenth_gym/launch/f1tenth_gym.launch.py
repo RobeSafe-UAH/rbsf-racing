@@ -27,6 +27,9 @@ Global:
 Every car also publishes /<ns>/ground_truth/odom (frame map). Its odom is the same pose in the
 <ns>/odom frame, whose origin is the map origin (see gym_bridge.py).
 
+The bridge and map_server load a copy of the track's map with its cones drawn in
+(rbsf_worlds/cones.py).
+
 f1tenth_gym needs NumPy 2, so the image installs it in its own venv (RBSF_GYM_PYTHON). The bridge
 is the only process started with that interpreter; everything else runs on the system one.
 """
@@ -43,6 +46,7 @@ from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from rbsf_f1tenth_gym.naming import bridge_parameters, bridge_remappings, opponent_namespace
+from rbsf_worlds.cones import with_cones
 from rbsf_worlds.paths import load_waypoints, spawn_poses
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
 import yaml
@@ -125,6 +129,8 @@ def launch_setup(context):
         raise RuntimeError(f'num_agents must be at least 1, got {num_agents}.')
     track = LaunchConfiguration('track').perform(context) or params['map_path']
     map_yaml = resolve_map_yaml(track, gym_python)
+    # The simulated map: the track's with its cones drawn in (the track's own yaml without).
+    sim_map_yaml = with_cones(map_yaml, tempfile.mkdtemp(prefix='rbsf_f1tenth_gym_'))
     use_sim_time = params.get('use_sim_time_bridge', False)
     vehicle = params.get('vehicle_params', 'f1tenth')
     start_poses = spawn_on_line(
@@ -138,7 +144,7 @@ def launch_setup(context):
         prefix=[gym_python],
         parameters=[config, bridge_parameters(robot), {
             'num_agents': num_agents,
-            'map_path': str(map_yaml),
+            'map_path': str(sim_map_yaml),
             'use_sim_time': False,  # the bridge itself always runs on wall time
             **start_poses,
         }],
@@ -146,7 +152,7 @@ def launch_setup(context):
         output='screen',
         on_exit=[Shutdown(reason='f1tenth_gym bridge exited')],
     )
-    scaled_yaml = scaled_map_yaml(map_yaml, params.get('scale', 1.0))
+    scaled_yaml = scaled_map_yaml(sim_map_yaml, params.get('scale', 1.0))
     map_server = Node(
         package='nav2_map_server',
         executable='map_server',

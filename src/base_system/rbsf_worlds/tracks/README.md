@@ -8,6 +8,12 @@ lines the stack drives on, in the f1tenth_gym CSV formats:
 
 A yaml may instead name its centerline with a `centerline:` key (path relative to the yaml).
 
+A yaml may also list synthetic cones under `cones:`, in map coordinates: `[x, y]` for one cone,
+`[x0, y0, x1, y1]` for a row of them (every 0.25 m, 20 cm wide, so no car fits through). Both
+simulators draw them into the map they load (`rbsf_worlds/cones.py`); the track's own image is
+left untouched. `levine` uses four rows to close the corridors that lead off its loop, so it is a
+closed lap.
+
 | Track | Length | Lines | Source |
 |---|---|---|---|
 | `levine` | 61.8 m (centerline) | centerline | f1tenth_gym_ros `maps/levine*` |
