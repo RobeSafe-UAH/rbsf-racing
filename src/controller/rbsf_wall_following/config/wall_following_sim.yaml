@@ -2,12 +2,6 @@
 # every namespaced instance (/r0/wall_follower, ...).
 /**:
   ros__parameters:
-    # Wall to follow: 'left' or 'right'. On a track with a reference line the launch file
-    # overrides it with the outer wall (wall_side:=auto); follow the outer wall, so corners show
-    # up as a wall ahead and not as a gap.
-    wall_side: left
-    # Target distance to the wall (m).
-    reference_distance: 0.7
     # Constant forward speed (m/s). drive_gate clips it to its max_auto_speed.
     speed: 1.5
     # Distance PI: steering (rad) per metre of distance error, and its integral term.
@@ -18,17 +12,32 @@
     orientation_kp: 1.0
     orientation_ki: 0.0
     orientation_integral_limit: 1.0
-    # Ray angles on the wall side (deg from the heading, mirrored for the right wall).
-    lateral_angle: 90.0
-    forward_angle: 60.0
-    # Half-width of the window (deg) whose median range is used for each ray.
-    ray_window: 2.0
+    # Boundaries (walls or cone rows) come from the scan points inside strips, never from single
+    # rays (see wall_following.py). Each side: the nearest boundary within bin_length (m) along
+    # x beside the car, and lookahead (m) ahead for its orientation. Keep bin_length longer than
+    # the gaps between cones (the RoboRacer cone rows use up to ~0.4 m).
+    bin_length: 1.0
+    lookahead: 1.2
+    # The car's path for the free distance ahead: |y| <= path_half_width (m), car half-width plus
+    # a margin. Keep it above half the widest cone gap, or a row ahead can hide in the gap.
+    path_half_width: 0.3
+    # Points less than front_margin (m) before the obstacle ahead are the obstacle, not a side.
+    front_margin: 0.2
+    # Hits needed in a strip before it counts (rejects stray returns).
+    min_points: 3
     # Steering limit (rad).
     max_steering: 0.4189
-    # Gaps: a wall-side hit farther than this (m) means the wall is lost (doorway, side
-    # opening): the car holds its heading.
-    max_wall_distance: 1.5
-    # Corners: below corner_distance (m) of free space ahead, steering blends linearly into full
-    # lock at corner_min_distance: away from the wall side, or towards it if the wall is lost.
+    # Gaps: a wall whose lateral hit is farther than this (m) is lost (doorway, side opening,
+    # the inner wall of a corner). With both lost the car holds its heading. Keep it above half
+    # the widest section: below that, the car never sees both walls and never centres (the sim
+    # tracks are 1.6-3.5 m wide).
+    max_wall_distance: 2.0
+    # With one wall lost, hold half the corridor width last measured with both walls, while that
+    # width is younger than width_memory (s); else hold fallback_distance (m) to the visible wall.
+    width_memory: 2.0
+    fallback_distance: 0.4
+    # Corners: below corner_distance (m) of free space in the car's path, steering blends
+    # linearly into full lock at corner_min_distance, towards the side that is more open just
+    # before the obstacle.
     corner_distance: 1.5
     corner_min_distance: 0.7

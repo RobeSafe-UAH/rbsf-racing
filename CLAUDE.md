@@ -43,7 +43,7 @@ src/
     rbsf_bringup/              # hardware bringup launch + RViz config
     rbsf_mvsim/                # MVSim worlds (.world.xml), vehicle/sensor definitions, world generator
   controller/
-    rbsf_wall_following/       # PI wall follower (distance + orientation terms), LaserScan -> /drive
+    rbsf_wall_following/       # PI corridor centring between walls or cone rows, LaserScan -> drive_gate
     rbsf_centerline_tracking/  # path tracker, /centerline (nav_msgs/Path) + /odom -> /drive
   localization/
     rbsf_slam_toolbox/         # slam_toolbox config (sim/real), map_saver node, centerline_publisher node
@@ -139,7 +139,8 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   ackermann_mux and joy_teleop)
 - [x] Hardware bringup (`rbsf_bringup`) and MVSim simulation packages. The real car is not
   tested yet.
-- [x] Wall-following controller (`rbsf_wall_following`), verified in MVSim and f1tenth_gym
+- [x] Wall-following controller (`rbsf_wall_following`), verified in MVSim and f1tenth_gym.
+  Reworked to centre between both walls (2026-10-07), not yet re-verified in sim
 - [x] Safety gate (`rbsf_safety` / `drive_gate`), verified in sim
 - [x] SLAM integration and map saving (mapping slot): DualSLAM (`rbsf_dual_slam`), verified in
   MVSim and f1tenth_gym. Cartographer does not close the start/finish loop on spielberg yet

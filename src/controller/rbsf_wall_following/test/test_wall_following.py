@@ -1,91 +1,220 @@
 import math
 
+import numpy as np
 import pytest
-from rbsf_wall_following.wall_following import PI, ray_range, wall_errors, WallFollower
+from rbsf_wall_following.wall_following import nearest, PI, scan_points, WallFollower
 
 ANGLE_MIN = -math.radians(135.0)
 INCREMENT = math.radians(0.25)
 N = 1081
 RANGE_MAX = 30.0
+DT = 0.025
+MAX_STEERING = 0.4189
+CONE_RADIUS = 0.1
+ANGLES = ANGLE_MIN + INCREMENT * np.arange(N)
+DX, DY = np.cos(ANGLES), np.sin(ANGLES)
 
 
-def wall_scan(distance, wall_angle=0.0, side='left'):
+def cast(walls=(), cones=()):
     """
-    Scan of one straight wall `distance` m to the side, rotated `wall_angle` rad from the heading.
+    Simulate the LaserScan ranges (inf: no return) of wall segments and cones.
 
-    The wall passes through (0, +-distance); a positive angle makes it diverge (left wall) ahead.
+    Walls are ((x0, y0), (x1, y1)) segments, cones (x, y) circles of CONE_RADIUS. Rays start at
+    the origin, the car's LiDAR.
     """
-    sign = 1.0 if side == 'left' else -1.0
-    px, py = 0.0, sign * distance
-    dx, dy = math.cos(sign * wall_angle), math.sin(sign * wall_angle)
-    ranges = []
-    for i in range(N):
-        a = ANGLE_MIN + i * INCREMENT
-        rx, ry = math.cos(a), math.sin(a)
-        denom = rx * dy - ry * dx
-        r = (px * dy - py * dx) / denom if abs(denom) > 1e-9 else -1.0
-        ranges.append(r if 0.0 < r < RANGE_MAX else math.inf)
-    return ranges
+    ranges = np.full(N, np.inf)
+    for (x0, y0), (x1, y1) in walls:
+        ex, ey = x1 - x0, y1 - y0
+        denom = DX * ey - DY * ex
+        with np.errstate(divide='ignore', invalid='ignore'):
+            t = (x0 * ey - y0 * ex) / denom        # along the ray
+            s = (x0 * DY - y0 * DX) / denom        # along the segment, 0..1
+        hit = (np.abs(denom) > 1e-12) & (t > 0.0) & (s >= 0.0) & (s <= 1.0)
+        ranges = np.where(hit, np.minimum(ranges, t), ranges)
+    for cx, cy in cones:
+        b = DX * cx + DY * cy
+        disc = b * b - (cx * cx + cy * cy - CONE_RADIUS ** 2)
+        t = b - np.sqrt(np.maximum(disc, 0.0))
+        hit = (disc >= 0.0) & (t > 0.0)
+        ranges = np.where(hit, np.minimum(ranges, t), ranges)
+    return np.where(ranges < RANGE_MAX, ranges, np.inf).tolist()
 
 
-def follower(side='left', kp=1.0):
-    return WallFollower(side, reference=0.7, lateral_angle=math.pi / 2,
-                        forward_angle=math.pi / 3, window=math.radians(2.0),
-                        distance_pi=PI(kp, 0.0, 1.0), orientation_pi=PI(kp, 0.0, 1.0),
-                        max_steering=0.4189)
+def boundary(side, distance, angle=0.0, gap=None, phase=0.0, x_range=(-20.0, 20.0)):
+    """
+    One side's boundary `distance` m from the car (inner surface), rotated `angle` rad.
+
+    side +1 (left) or -1 (right). gap=None: a wall; else a cone row with `gap` m between
+    neighbouring cones, shifted `phase` m along the row. Returns (walls, cones) for cast().
+    """
+    ux, uy = math.cos(angle), math.sin(angle)
+    if gap is None:
+        (a, b) = x_range
+        p0 = (a * ux - side * distance * uy, a * uy + side * distance * ux)
+        p1 = (b * ux - side * distance * uy, b * uy + side * distance * ux)
+        return [(p0, p1)], []
+    offset = side * (distance + CONE_RADIUS)
+    spacing = gap + 2 * CONE_RADIUS
+    s = np.arange(x_range[0], x_range[1], spacing) + phase
+    return [], [(si * ux - offset * uy, si * uy + offset * ux) for si in s]
 
 
-def test_parallel_wall_errors():
-    scan = wall_scan(1.0)
-    lat = ray_range(scan, ANGLE_MIN, INCREMENT, math.pi / 2, 0.0, RANGE_MAX)
-    fwd = ray_range(scan, ANGLE_MIN, INCREMENT, math.pi / 3, 0.0, RANGE_MAX)
-    de, oe = wall_errors(lat, fwd, math.pi / 2, math.pi / 3, 0.7)
-    assert de == pytest.approx(0.3, abs=1e-6)
-    assert oe == pytest.approx(0.0, abs=1e-6)
+def corridor(left, right, angle=0.0, gap=None, phase=0.0):
+    """Build the walls and cones of a straight corridor; None: no boundary on that side."""
+    walls, cones = [], []
+    for side, d, ph in ((1, left, phase), (-1, right, phase + 0.17)):
+        if d is not None:
+            w, c = boundary(side, d, angle, gap, ph)
+            walls += w
+            cones += c
+    return walls, cones
 
 
-def test_wall_angle_sign():
-    # Wall converging ahead (car heading into it): negative orientation error, steer right.
-    scan = wall_scan(0.7, wall_angle=-0.2)
-    lat = ray_range(scan, ANGLE_MIN, INCREMENT, math.pi / 2, 0.0, RANGE_MAX)
-    fwd = ray_range(scan, ANGLE_MIN, INCREMENT, math.pi / 3, 0.0, RANGE_MAX)
-    _, oe = wall_errors(lat, fwd, math.pi / 2, math.pi / 3, 0.7)
-    assert oe == pytest.approx(-0.2, abs=1e-6)
-    assert follower().steering(scan, ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) < 0.0
+def scan(left, right, angle=0.0, gap=None, phase=0.0):
+    return cast(*corridor(left, right, angle, gap, phase))
 
 
-def test_too_far_steers_towards_wall():
-    assert follower('left').steering(
-        wall_scan(1.0), ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) > 0.0
-    assert follower('right').steering(
-        wall_scan(1.0, side='right'), ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) < 0.0
+def follower(kp=1.0, ki=0.0, width_memory=2.0):
+    return WallFollower(distance_pi=PI(kp, ki, 1.0), orientation_pi=PI(kp, ki, 1.0),
+                        max_steering=MAX_STEERING, max_wall_distance=1.0,
+                        fallback_distance=0.4, width_memory=width_memory,
+                        corner_distance=1.5, corner_min_distance=0.7)
 
 
-@pytest.mark.parametrize('distance, angle', [(0.5, 0.1), (0.9, -0.15), (0.7, 0.0)])
-def test_left_right_mirror(distance, angle):
-    left = follower('left').steering(
-        wall_scan(distance, angle, 'left'), ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025)
-    right = follower('right').steering(
-        wall_scan(distance, angle, 'right'), ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025)
-    assert right == pytest.approx(-left, abs=1e-9)
+def steer(f, ranges, dt=DT):
+    return f.steering(ranges, ANGLE_MIN, INCREMENT, RANGE_MAX, dt)
+
+
+# Boundaries: a wall, and cone rows with tight (5 cm) and RoboRacer-style (40 cm, 50 cm) gaps.
+GAPS = [None, 0.05, 0.4, 0.5]
+
+
+def test_scan_points_drop_invalid_returns():
+    x, y = scan_points([1.0, math.nan, math.inf, 0.0, -1.0, 40.0], 0.0, 0.1, RANGE_MAX)
+    assert len(x) == 1 and x[0] == pytest.approx(1.0) and y[0] == pytest.approx(0.0)
+
+
+def test_nearest_ignores_stray_returns():
+    assert nearest(np.array([0.1, 0.9, 1.0, 1.0, 1.1]), 3) == 1.0
+    assert nearest(np.array([0.1, 0.2]), 3) == math.inf
+
+
+@pytest.mark.parametrize('gap', GAPS)
+def test_centred_goes_straight(gap):
+    for phase in (0.0, 0.13, 0.31):
+        f = follower()
+        assert steer(f, scan(0.7, 0.7, gap=gap, phase=phase)) == pytest.approx(0.0, abs=0.02)
+        assert f.width == pytest.approx(1.4, abs=0.02)
+
+
+@pytest.mark.parametrize('gap', GAPS)
+def test_off_centre_steers_to_the_centre(gap):
+    assert steer(follower(), scan(0.5, 0.9, gap=gap)) < -0.1
+    assert steer(follower(), scan(0.9, 0.5, gap=gap)) > 0.1
+
+
+@pytest.mark.parametrize('gap', GAPS)
+def test_corridor_turning_left_steers_left(gap):
+    assert steer(follower(), scan(0.7, 0.7, angle=0.1, gap=gap)) > 0.05
+    assert steer(follower(), scan(0.7, 0.7, angle=-0.1, gap=gap)) < -0.05
+
+
+@pytest.mark.parametrize('left, right, angle',
+                         [(0.5, 0.9, 0.1), (0.8, 0.6, -0.15), (0.7, None, 0.05),
+                          (None, 0.6, 0.0)])
+def test_left_right_mirror(left, right, angle):
+    a = steer(follower(), scan(left, right, angle))
+    b = steer(follower(), scan(right, left, -angle))
+    assert b == pytest.approx(-a, abs=1e-6)
+
+
+@pytest.mark.parametrize('gap', GAPS)
+def test_lone_boundary_without_history_holds_fallback(gap):
+    assert steer(follower(), scan(None, 0.4, gap=gap)) == pytest.approx(0.0, abs=0.02)
+    assert steer(follower(), scan(0.4, None, gap=gap)) == pytest.approx(0.0, abs=0.02)
+
+
+def test_lone_wall_too_far_without_history_steers_towards_it():
+    assert steer(follower(), scan(None, 0.7)) < 0.0
+    assert steer(follower(), scan(0.7, None)) > 0.0
+
+
+def test_lone_wall_with_history_holds_half_the_width():
+    f = follower(width_memory=2.0)
+    steer(f, scan(0.7, 0.7))
+    # The right wall disappears: the car keeps 0.7 m to the left one.
+    lone = scan(0.7, None)
+    for _ in range(int(2.0 / DT) - 1):
+        assert steer(f, lone) == pytest.approx(0.0, abs=1e-3)
+    # The remembered width expires: back to 0.4 m, steer towards the left wall.
+    for _ in range(3):
+        steering = steer(f, lone)
+    assert steering > 0.0
+
+
+def test_history_refreshes_with_both_walls():
+    f = follower(width_memory=0.1)
+    for _ in range(10):
+        steer(f, scan(0.7, None))
+    steer(f, scan(0.6, 0.6))
+    assert f.width == pytest.approx(1.2, abs=1e-3) and f.width_age == 0.0
+    assert steer(f, scan(0.6, None)) == pytest.approx(0.0, abs=1e-3)
+
+
+def test_no_walls_holds_heading_and_freezes_integrals():
+    f = follower(ki=1.0)
+    for _ in range(10):
+        assert steer(f, scan(None, None)) == 0.0
+    assert f.distance_pi.integral == 0.0 and f.orientation_pi.integral == 0.0
+
+
+def test_opening_ahead_drops_that_sides_orientation():
+    # Left wall only beside the car (it ends at x = 0.5), right wall all along.
+    walls = boundary(1, 0.7, x_range=(-20.0, 0.5))[0] + boundary(-1, 0.7)[0]
+    assert steer(follower(), cast(walls)) == pytest.approx(0.0, abs=1e-3)
+
+
+def cross_wall(x, half_width=3.0):
+    return [((x, -half_width), (x, half_width))]
+
+
+@pytest.mark.parametrize('side', [1, -1])
+def test_front_blocked_turns_towards_the_open_side(side):
+    # Corner turning towards `side`: only the opposite boundary, a wall ahead.
+    walls = boundary(-side, 0.4)[0]
+    assert steer(follower(), cast(walls + cross_wall(0.6))) == \
+        pytest.approx(side * MAX_STEERING)
+    # Halfway through the corner band: half lock.
+    assert steer(follower(), cast(walls + cross_wall(1.1))) == \
+        pytest.approx(side * 0.5 * MAX_STEERING, abs=1e-3)
+
+
+@pytest.mark.parametrize('gap', [0.05, 0.4, 0.5])
+@pytest.mark.parametrize('phase', [0.0, 0.2])
+def test_cone_row_ahead_is_an_obstacle_even_through_a_gap(gap, phase):
+    # Levine-like corner: the left boundary ends beside the car, the right one continues, and a
+    # cone row crosses the path. phase 0 centres a gap on the heading, so the rays straight
+    # ahead see nothing.
+    spacing = gap + 2 * CONE_RADIUS
+    row_x = 0.6 + CONE_RADIUS
+    cones = [(row_x, y) for y in np.arange(-3.0, 3.0, spacing) + spacing / 2 + phase]
+    walls = boundary(1, 0.7, x_range=(-20.0, -0.7))[0] + boundary(-1, 0.7)[0]
+    f = follower()
+    assert f.front_distance(*scan_points(cast(walls, cones), ANGLE_MIN, INCREMENT, RANGE_MAX)) \
+        == pytest.approx(0.6, abs=0.06)
+    assert steer(f, cast(walls, cones)) == pytest.approx(MAX_STEERING)
 
 
 def test_steering_is_clipped():
-    assert follower(kp=100.0).steering(
-        wall_scan(3.0), ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) == pytest.approx(0.4189)
+    assert steer(follower(kp=100.0), scan(0.2, 0.9)) == pytest.approx(-MAX_STEERING)
 
 
-def test_invalid_rays_count_as_range_max():
-    ranges = [math.nan, math.inf, 0.0, 1.0, 1.0]
-    # Window covers all five rays: three invalid (range_max) and two at 1 m -> median range_max.
-    assert ray_range(ranges, 0.0, 0.1, 0.2, 0.2, RANGE_MAX) == RANGE_MAX
-    # A single noisy ray is filtered out by the median.
-    assert ray_range([1.0, 1.0, math.nan, 1.0, 1.0], 0.0, 0.1, 0.2, 0.2, RANGE_MAX) == 1.0
-
-
-def test_angle_outside_scan_raises():
-    with pytest.raises(ValueError):
-        ray_range([1.0] * 10, 0.0, 0.1, 2.0, 0.0, RANGE_MAX)
+def test_invalid_parameters_raise():
+    pi = PI(1.0, 0.0, 1.0)
+    for kwargs in ({'fallback_distance': 0.0}, {'width_memory': -1.0}, {'bin_length': 0.0},
+                   {'min_points': 0}, {'corner_distance': 1.0, 'corner_min_distance': 1.0}):
+        with pytest.raises(ValueError):
+            WallFollower(pi, pi, 0.4, **kwargs)
 
 
 def test_pi_anti_windup_and_invalid_dt():
@@ -97,65 +226,3 @@ def test_pi_anti_windup_and_invalid_dt():
     for dt in (0.0, -0.1, math.nan, math.inf):
         pi.update(1.0, dt)
     assert pi.integral == before
-
-
-def gap_follower(side='left'):
-    return WallFollower(side, reference=0.7, lateral_angle=math.pi / 2,
-                        forward_angle=math.pi / 3, window=math.radians(2.0),
-                        distance_pi=PI(1.0, 1.0, 1.0), orientation_pi=PI(1.0, 1.0, 1.0),
-                        max_steering=0.4189, max_wall_distance=1.5, corner_distance=1.5,
-                        corner_min_distance=0.7)
-
-
-def with_rays(ranges, value, lo_deg, hi_deg):
-    """Copy of `ranges` with the rays between lo_deg and hi_deg set to `value`."""
-    out = list(ranges)
-    for i in range(N):
-        if lo_deg <= math.degrees(ANGLE_MIN + i * INCREMENT) <= hi_deg:
-            out[i] = value
-    return out
-
-
-@pytest.mark.parametrize('side', ['left', 'right'])
-def test_side_opening_keeps_straight(side):
-    # Wall at 0.7 m with an opening on the wall side; the road ahead is clear.
-    sign = 1 if side == 'left' else -1
-    lo, hi = sorted((sign * 40.0, sign * 120.0))
-    scan = with_rays(wall_scan(0.7, side=side), math.inf, lo, hi)
-    f = gap_follower(side)
-    assert f.steering(scan, ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) == 0.0
-    assert f.distance_pi.integral == 0.0 and f.orientation_pi.integral == 0.0
-
-
-@pytest.mark.parametrize('side', ['left', 'right'])
-def test_wall_lost_with_front_blocked_turns_towards_wall_side(side):
-    sign = 1 if side == 'left' else -1
-    lo, hi = sorted((sign * 40.0, sign * 120.0))
-    scan = with_rays(with_rays(wall_scan(0.7, side=side), math.inf, lo, hi), 0.6, -10.0, 10.0)
-    assert gap_follower(side).steering(
-        scan, ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) == pytest.approx(sign * 0.4189)
-
-
-@pytest.mark.parametrize('side', ['left', 'right'])
-def test_wall_ahead_turns_away_from_wall_side(side):
-    # Corner turning away from the followed wall: the wall is there, the front gets blocked.
-    sign = 1 if side == 'left' else -1
-    straight = wall_scan(0.7, side=side)
-    f = gap_follower(side)
-    assert f.steering(straight, ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) == \
-        pytest.approx(0.0, abs=1e-3)
-    halfway = f.steering(with_rays(straight, 1.1, -10.0, 10.0),
-                         ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025)
-    assert halfway == pytest.approx(-sign * 0.5 * 0.4189, abs=1e-3)
-    assert gap_follower(side).steering(with_rays(straight, 0.5, -10.0, 10.0),
-                                       ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) == \
-        pytest.approx(-sign * 0.4189)
-
-
-def test_opening_ahead_drops_orientation_term():
-    # Lateral ray still on the wall at the reference, forward ray into an opening.
-    scan = with_rays(wall_scan(0.7), math.inf, 50.0, 70.0)
-    assert gap_follower().steering(
-        scan, ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) == pytest.approx(0.0, abs=1e-3)
-    # Without gap handling (legacy behaviour) the same scan steers hard into the opening.
-    assert follower().steering(scan, ANGLE_MIN, INCREMENT, RANGE_MAX, 0.025) > 0.3

@@ -30,8 +30,8 @@ def slot_arguments(slot, robot, platform, track, use_sim_time, extra=None):
     """
     Launch arguments of one slot: the component contract plus the behaviour's `extra[slot]`.
 
-    Extra arguments are implementation options a behaviour exposes (e.g. the controller's
-    wall_side). An implementation that does not declare one simply ignores it.
+    Extra arguments are implementation options a behaviour exposes (e.g. a controller's gains
+    file). An implementation that does not declare one simply ignores it.
     """
     contract = {'robot': robot, 'platform': platform, 'track': track,
                 'use_sim_time': str(use_sim_time).lower()}

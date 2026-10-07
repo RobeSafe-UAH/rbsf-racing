@@ -33,7 +33,7 @@ IMPLEMENTATIONS = {
 }
 
 # Track of each platform when the behaviour gets none. The simulators need a world; the real car
-# drives an unknown track (a track there would also steer wall_side:=auto by its reference line).
+# drives an unknown track.
 DEFAULT_TRACK = {'real': '', 'mvsim': 'levine', 'f1tenth': 'levine'}
 
 # The simulators run in real time and stamp their output with wall time (MVSim's adapter, and the

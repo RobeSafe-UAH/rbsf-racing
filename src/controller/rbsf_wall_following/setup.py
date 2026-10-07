@@ -18,7 +18,7 @@ setup(
     zip_safe=True,
     maintainer='santimontiel',
     maintainer_email='santimontieleu@gmail.com',
-    description='Reactive PI wall following on LiDAR scans.',
+    description='Reactive PI corridor centring on LiDAR scans.',
     license='Apache-2.0',
     tests_require=['pytest'],
     entry_points={

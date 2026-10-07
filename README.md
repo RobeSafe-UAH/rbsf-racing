@@ -76,15 +76,16 @@ shuts the whole stack down. Its state is on `/<ns>/drive_gate/state`.
 
 ### Autonomous exploration
 
-The car follows a wall (`rbsf_wall_following`, PI on two LiDAR rays, with gap and corner
-handling) while the mapping slot builds the map. The default mapper is DualSLAM
-(`rbsf_dual_slam`): SLAM Toolbox and Cartographer map side by side from the same scans.
+The car centres itself between the track boundaries (`rbsf_wall_following`, PI on the nearest
+LiDAR points beside and ahead of the car, with gap and corner handling) while the mapping slot
+builds the map. Boundaries may be walls or rows of cones with gaps (tested up to 0.4 m in sim).
+The default mapper is DualSLAM (`rbsf_dual_slam`): SLAM Toolbox and Cartographer map side by
+side from the same scans.
 
 ```bash
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=spielberg
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth track:=spielberg
 #   robot:=r0  headless:=true  foxglove:=false  rviz:=false  joy:=false  require_deadman:=true
-#   wall_side:=auto|left|right
 #   mapping:=dual_slam|slam_toolbox|cartographer|identity ... controller:=wall_following
 
 # Save both maps (gamepad Y does the same):
@@ -127,10 +128,10 @@ ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/
   source map's frame, so the result is a self-contained track for both simulators and the planners.
 - The algorithm (`rbsf_worlds/centerline.py`) is shared with `scripts/tracks/drawn_track.py`.
 
-- With `wall_side:=auto` (default), on a track with a reference line, the car follows its outer
-  wall (right on counter-clockwise tracks, left on clockwise ones). Otherwise it follows the
-  YAML's `wall_side`. `track` defaults to `levine` on the simulators and to none on the real
-  car, so pass `wall_side:=left|right` there. Gains and distances are in
+- The car keeps the same distance to both walls. A wall farther than `max_wall_distance` (2.0 m
+  on the simulators, 1.0 m on the car) is lost (opening, the inner wall of a corner): the car
+  then holds half the corridor width last measured with both walls (for up to 2 s), or 0.4 m,
+  to the other wall. With both walls lost it holds its heading. Gains and distances are in
   `src/controller/rbsf_wall_following/config/wall_following_{sim,real}.yaml`.
 - `levine` is a building floor with junctions that lead off the loop: the car explores them.
   Use `iros2026` or `spielberg` for a closed lap.
@@ -140,11 +141,11 @@ ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/
 ### Real car
 
 ```bash
-# Everything on the car (follow the outer wall: wall_side:=left|right)
-ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real wall_side:=left
+# Everything on the car
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real
 # Distributed: same ROS_DOMAIN_ID on both machines (make run ROS_DOMAIN_ID=<n>)
 ros2 launch stack_launcher platform.launch.py platform:=real                                    # car
-ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed wall_side:=left  # laptop
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed  # laptop
 ```
 
 `rbsf_bringup` starts the VESC (`/dev/sensors/vesc`), the Hokuyo (Ethernet, 192.168.0.10), RF2O

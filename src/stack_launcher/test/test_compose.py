@@ -7,6 +7,6 @@ def test_contract_arguments_reach_every_slot():
 
 
 def test_extra_arguments_reach_only_their_slot():
-    extra = {'controller': {'wall_side': 'right'}}
-    assert slot_arguments('controller', 'r0', 'real', '', False, extra)['wall_side'] == 'right'
-    assert 'wall_side' not in slot_arguments('mapping', 'r0', 'real', '', False, extra)
+    extra = {'controller': {'params_file': 'x.yaml'}}
+    assert slot_arguments('controller', 'r0', 'real', '', False, extra)['params_file'] == 'x.yaml'
+    assert 'params_file' not in slot_arguments('mapping', 'r0', 'real', '', False, extra)

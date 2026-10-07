@@ -40,12 +40,14 @@ implemented today. Racing on the generated track is not (see the end).
   | LB (4), held | Manual driving: left stick speed, right stick steering. Always wins |
   | Y (3) | Save the maps (step 2) |
 
-- **Wall side.** Decide which wall the car follows, and pass it as `wall_side:=left|right` at
-  launch (step 2). Follow the **outer** wall: left on a clockwise lap, right on a
-  counter-clockwise one. Gaps (pit lane, openings) on that side make the car turn into them;
-  the outer wall is usually the continuous one. Without the argument the car follows
-  `wall_side` in `src/controller/rbsf_wall_following/config/wall_following_real.yaml` (left).
-  Distance (0.7 m) and speed (0.8 m/s) are in that file too.
+- **Wall following.** The car centres itself between both walls. A wall farther than 1.0 m
+  (`max_wall_distance`) is lost: the car holds half the last measured corridor width (for up to
+  `width_memory` = 2 s), or 0.4 m (`fallback_distance`), to the other wall. With both walls lost
+  it holds its heading, so a section wider than 2 m needs a larger `max_wall_distance`. Rows of
+  cones count as walls as long as their gaps are shorter than `bin_length` (1.0 m) and narrower
+  than twice `path_half_width` (0.3 m), so up to ~0.5 m; check the gaps on the track. These and
+  the speed (0.8 m/s) are in
+  `src/controller/rbsf_wall_following/config/wall_following_real.yaml`.
 
 ## 1. Bring up and check the car
 
@@ -69,11 +71,11 @@ On the laptop, with the car's platform side running:
 
 ```bash
 ros2 launch stack_launcher autonomous_exploration.launch.py \
-    platform:=real deployment:=distributed wall_side:=<left|right>
+    platform:=real deployment:=distributed
 ```
 
-- The launch log confirms the wall (`Following the <side> wall at 0.7 m, 0.8 m/s`) and shows
-  `track=none`: on the car there is no track by default, so nothing from the simulator tracks
+- The launch log confirms the controller (`Centring between the walls (fallback 0.4 m to a lone
+  wall), 0.8 m/s`) and shows `track=none`: on the car there is no track by default, so nothing from the simulator tracks
   steers the run.
 - The mapper is DualSLAM: SLAM Toolbox owns `/map` and the `map -> r0/odom` transform, and
   Cartographer maps in parallel on `/r0/mapping/cartographer/map`. On the car Cartographer is
@@ -147,7 +149,7 @@ Bottom-left: both maps overlaid in the `map` frame. Judge each map by:
 |---|---|
 | One map passes | Use it (step 4) after a look at the figure |
 | Both pass | Use the recommended one, unless the figure shows it is worse |
-| Both fail | Drive another lap (new session), slower or on the other wall. `--force` only after checking the map by eye |
+| Both fail | Drive another lap (new session), slower. `--force` only after checking the map by eye |
 
 ## 4. Centerline generation
 
@@ -214,8 +216,8 @@ track:
 |---|---|---|
 | Gate stays `NO_JOY` | Gamepad not seen | Pair it on the car's host; check `ros2 topic echo /r0/joy` |
 | Gate shows `AUTO_CMD_TIMEOUT` while RB is held | Components not running, or network/`ROS_DOMAIN_ID` mismatch | Check the laptop launch; `ros2 topic hz /r0/drive_gate/auto_cmd` on the car |
-| Car follows the wrong wall | `wall_side` not given (the YAML's side applies) | Relaunch with `wall_side:=left` or `right` |
-| Car turns into an opening | Gap on the followed wall | Follow the other wall, or take over with LB through that section |
+| Car drifts into an opening | Width memory expired before the gap ended | Raise `width_memory`, or take over with LB through that section |
+| Car goes straight where the track is wide | Both walls farther than `max_wall_distance` | Raise `max_wall_distance` above half the track width |
 | `save_maps`: "No map received yet" | The SLAMs are not running or have no scans | Check `/r0/scan` and the launch output |
 | `closed_loop` fails on both maps | Lap not closed before saving | Drive further past the start line, save again |
 | `trajectory_in_corridor` fails | That SLAM drifted | Use the other map, or remap more slowly |

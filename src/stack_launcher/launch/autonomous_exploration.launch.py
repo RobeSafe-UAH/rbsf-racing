@@ -1,7 +1,7 @@
 """
 Behaviour: autonomous exploration.
 
-The car drives on its own by following a wall while the mapping slot builds the map (legacy
+The car drives on its own, centred between the walls, while the mapping slot builds the map (legacy
 02_autonomous_slam). By default the mapper is DualSLAM: SLAM Toolbox (owns /map and
 map -> <robot>/odom) and Cartographer (on /<robot>/mapping/cartographer/map) side by side.
 
@@ -15,7 +15,7 @@ Slots (defaults, each overridable with <slot>:=<implementation>):
 Quick start:
     ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=levine
     ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth
-    ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real wall_side:=right
+    ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real
 Save both maps (PGM + YAML for the offline map tools, plus each SLAM's own state) into
 maps/<YYYYMMDD_HHMMSS>/ with joystick button Y, or:
     ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger
@@ -23,11 +23,6 @@ Distributed (same ROS_DOMAIN_ID on both machines):
     car:      ros2 launch stack_launcher platform.launch.py platform:=real
     compute:  ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real \
                   deployment:=distributed
-
-Wall side: wall_side:=auto (default) follows the track's outer wall when the track has a
-reference line, else wall_side in rbsf_wall_following's YAML (_real/_sim). track defaults to
-levine on the simulators and to none on the real car, so pass wall_side:=left|right there: the
-outer wall (left on a clockwise lap, right on a counter-clockwise one).
 
 On the real car the wheels only turn while drive_gate allows it (docs/DESIGN_PHILOSOPHY.md §6):
 arm with START, then hold RB (autonomous) or LB (manual, left stick + right stick).
@@ -56,9 +51,6 @@ def launch_setup(context):
     validate(platform, deployment, slots)
     robot = arg('robot').strip('/')
     track = resolve_track(platform, arg('track'))
-    wall_side = arg('wall_side')
-    if wall_side not in ('auto', 'left', 'right'):
-        raise ValueError(f"wall_side must be auto, left or right, not '{wall_side}'")
 
     actions = [LogInfo(msg=f'Autonomous exploration on {platform} ({deployment}), /{robot}: '
                            + ', '.join(f'{slot}={name}' for slot, name in slots.items())
@@ -68,8 +60,7 @@ def launch_setup(context):
             'platform': platform, 'robot': robot, 'track': track, 'headless': arg('headless'),
             'rviz': arg('rviz'), 'foxglove': arg('foxglove'), 'joy': arg('joy'),
             'require_deadman': arg('require_deadman')}))
-    actions += include_slots(slots, robot, platform, track, USE_SIM_TIME[platform],
-                             extra={'controller': {'wall_side': wall_side}})
+    actions += include_slots(slots, robot, platform, track, USE_SIM_TIME[platform])
     return actions
 
 
@@ -86,10 +77,6 @@ def generate_launch_description():
             'track', default_value='',
             description='rbsf_worlds track or map yaml. Default: levine on the simulators, '
                         'none on real.'),
-        DeclareLaunchArgument(
-            'wall_side', default_value='auto',
-            description="Wall to follow: auto (the track's outer wall, else the YAML), left or "
-                        'right. Set it on real, where there is no track by default.'),
         *[DeclareLaunchArgument(
             slot, default_value=DEFAULT_SLOTS[slot],
             description=f"{slot} implementation: {', '.join(IMPLEMENTATIONS[slot])}.")

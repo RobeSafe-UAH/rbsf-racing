@@ -1,5 +1,5 @@
 """
-Reactive wall following: keep a reference distance to the left (or right) wall with a PI loop.
+Reactive wall following: keep the car centred between the left and right walls with a PI loop.
 
 Runs inside a car's namespace (/r0, ...), so its topics are relative. It is the controller slot of
 the stack (docs/DESIGN_PHILOSOPHY.md): its commands go to drive_gate, never straight to `drive`.
@@ -7,21 +7,24 @@ the stack (docs/DESIGN_PHILOSOPHY.md): its commands go to drive_gate, never stra
 Subscribes  scan                  sensor_msgs/LaserScan
 Publishes   drive_gate/auto_cmd   ackermann_msgs/AckermannDriveStamped (constant speed)
 
+Boundaries may be walls or rows of cones with gaps, so nothing comes from single rays: the
+scan becomes points, and each measurement is the nearest point inside a strip (a strip longer
+than the gaps always holds a cone).
+
 Algorithm, on every scan (see wall_following.py):
     1. dt from the scan stamps (scan_time on the first one).
-    2. Median range around the lateral ray (90 deg) and the forward ray (60 deg) on the wall side.
-    3. Distance error = lateral distance - reference_distance; orientation error = angle of the
-       wall (line through both hits) relative to the heading.
-    4. Steering = PI(distance error) + PI(orientation error), mirrored for a right wall and
-       clipped to max_steering. Speed is the constant `speed`.
-    5. Gaps: a wall-side hit farther than max_wall_distance means the wall is lost (doorway,
-       side opening): skip the PI and hold the heading.
-    6. Corners: as the front range drops from corner_distance to corner_min_distance, blend
-       linearly into full lock, away from the wall side (wall present) or towards it (wall
-       lost).
+    2. Front: nearest point in the car's path (|y| <= path_half_width). Per side: nearest
+       boundary in a bin_length strip beside the car (near) and lookahead m ahead (far). A side
+       is visible while its near distance is within max_wall_distance.
+    3. Both sides visible: distance error = (d_left - d_right) / 2, and the corridor width is
+       remembered. One side visible: hold half the remembered width (younger than width_memory)
+       to it, else fallback_distance. None: skip the PI and hold the heading.
+    4. Orientation error = mean angle of the visible boundaries (near to far) relative to the
+       heading. Steering = PI(distance error) + PI(orientation error), clipped to max_steering.
+       Speed is the constant `speed`.
+    5. Corners: as the front distance drops from corner_distance to corner_min_distance, blend
+       linearly into full lock towards the side that is more open just before the obstacle.
 """
-
-import math
 
 from ackermann_msgs.msg import AckermannDriveStamped
 from rbsf_wall_following.wall_following import PI, WallFollower
@@ -36,8 +39,6 @@ class WallFollowerNode(Node):
 
     def __init__(self):
         super().__init__('wall_follower')
-        self.declare_parameter('wall_side', 'left')
-        self.declare_parameter('reference_distance', 0.7)
         self.declare_parameter('speed', 1.0)
         self.declare_parameter('distance_kp', 1.0)
         self.declare_parameter('distance_ki', 0.0)
@@ -45,34 +46,40 @@ class WallFollowerNode(Node):
         self.declare_parameter('orientation_kp', 1.0)
         self.declare_parameter('orientation_ki', 0.0)
         self.declare_parameter('orientation_integral_limit', 1.0)
-        self.declare_parameter('lateral_angle', 90.0)
-        self.declare_parameter('forward_angle', 60.0)
-        self.declare_parameter('ray_window', 2.0)
+        self.declare_parameter('bin_length', 1.0)
+        self.declare_parameter('lookahead', 1.2)
+        self.declare_parameter('path_half_width', 0.3)
+        self.declare_parameter('front_margin', 0.2)
+        self.declare_parameter('min_points', 3)
         self.declare_parameter('max_steering', 0.4189)
-        self.declare_parameter('max_wall_distance', 1.5)
+        self.declare_parameter('max_wall_distance', 1.0)
+        self.declare_parameter('fallback_distance', 0.4)
+        self.declare_parameter('width_memory', 2.0)
         self.declare_parameter('corner_distance', 1.5)
         self.declare_parameter('corner_min_distance', 0.7)
 
         param = lambda name: self.get_parameter(name).value  # noqa: E731
         self.speed = float(param('speed'))
         self.follower = WallFollower(
-            wall_side=param('wall_side'),
-            reference=float(param('reference_distance')),
-            lateral_angle=math.radians(param('lateral_angle')),
-            forward_angle=math.radians(param('forward_angle')),
-            window=math.radians(param('ray_window')),
             distance_pi=PI(param('distance_kp'), param('distance_ki'),
                            param('distance_integral_limit')),
             orientation_pi=PI(param('orientation_kp'), param('orientation_ki'),
                               param('orientation_integral_limit')),
             max_steering=float(param('max_steering')),
+            bin_length=float(param('bin_length')),
+            lookahead=float(param('lookahead')),
+            path_half_width=float(param('path_half_width')),
+            front_margin=float(param('front_margin')),
+            min_points=int(param('min_points')),
             max_wall_distance=float(param('max_wall_distance')),
+            fallback_distance=float(param('fallback_distance')),
+            width_memory=float(param('width_memory')),
             corner_distance=float(param('corner_distance')),
             corner_min_distance=float(param('corner_min_distance')),
         )
         self.get_logger().info(
-            f"Following the {param('wall_side')} wall at {param('reference_distance')} m, "
-            f'{self.speed} m/s')
+            f"Centring between the walls (fallback {param('fallback_distance')} m to a lone "
+            f'wall), {self.speed} m/s')
 
         self.previous_stamp = None
         self.drive_pub = self.create_publisher(AckermannDriveStamped, 'drive_gate/auto_cmd', 10)

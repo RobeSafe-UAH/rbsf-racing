@@ -3,7 +3,7 @@
 <package format="3">
   <name>rbsf_wall_following</name>
   <version>0.1.0</version>
-  <description>Reactive PI wall following on LiDAR scans (controller slot) for the RBSF Racing stack.</description>
+  <description>Reactive PI corridor centring on LiDAR scans (controller slot) for the RBSF Racing stack.</description>
   <maintainer email="santimontieleu@gmail.com">santimontiel</maintainer>
   <license>Apache-2.0</license>
 
@@ -12,7 +12,6 @@
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
-  <exec_depend>rbsf_worlds</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
 
