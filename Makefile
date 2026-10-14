@@ -13,7 +13,7 @@ CONTAINER     ?= rbsf-racing-$(FLAVOR)
 BASE_IMAGE    ?= ubuntu:24.04
 
 # Must match on the car and the compute node in distributed mode.
-ROS_DOMAIN_ID ?= 0
+ROS_DOMAIN_ID ?= 42
 RMW_IMPLEMENTATION ?=
 GPU           ?= $(if $(shell command -v nvidia-smi 2>/dev/null),1,0)
 AUTO_BUILD    ?= 1
