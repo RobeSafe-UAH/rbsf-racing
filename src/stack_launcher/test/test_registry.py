@@ -12,8 +12,9 @@ def test_every_slot_has_an_identity():
     assert set(USE_SIM_TIME) == set(PLATFORMS)
 
 
-def test_valid_selection():
-    validate('mvsim', 'local', {**VALID, 'controller': 'wall_following'})
+@pytest.mark.parametrize('controller', ['wall_following', 'follow_the_gap'])
+def test_valid_selection(controller):
+    validate('mvsim', 'local', {**VALID, 'controller': controller})
     validate('real', 'distributed', VALID)
 
 

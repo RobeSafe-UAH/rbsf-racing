@@ -102,7 +102,7 @@ at a glance.
 | **localization** | Estimate the car's pose in `map`. | particle filter / AMCL on a known map | `odom` composed with `map -> <ns>/odom` (TF) on `localization/odom`. A real map-frame pose alongside a SLAM mapper, ground truth on the simulators. |
 | **perception** | Detect opponents and obstacles. | LiDAR opponent detection | Publishes an empty opponent list at a fixed rate. |
 | **planning** | Produce the trajectory to follow: global line, overtaking, avoidance. | raceline / overtaking planner | Republishes the track's reference line (`rbsf_worlds`, `track:=`) as the trajectory. |
-| **controller** | Turn trajectory + pose (or raw scan, for reactive controllers) into an Ackermann command. | `pure_pursuit`, `wall_following` | Publishes zero commands (speed 0, steering 0). The car stays still. |
+| **controller** | Turn trajectory + pose (or raw scan, for reactive controllers) into an Ackermann command. | `pure_pursuit`, `wall_following`, `follow_the_gap` | Publishes zero commands (speed 0, steering 0). The car stays still. |
 
 **Mapping owns SLAM.** Exactly one component publishes `map -> <ns>/odom`:
 
@@ -241,7 +241,7 @@ Planned behaviours (legacy equivalents in parentheses):
 |---|---|---|---|---|---|
 | `teleop_mapping` (`00_teleop_slam`) | dual_slam | identity | identity | identity | identity |
 | `wall_following` (`01_wall_following`) | identity | identity | identity | identity | wall_following |
-| `autonomous_exploration` (`02_autonomous_slam`) | dual_slam | identity | identity | identity | wall_following |
+| `autonomous_exploration` (`02_autonomous_slam`) | dual_slam | identity | identity | identity | wall_following (or follow_the_gap) |
 | `raceline_tracking` (`03_centerline_tracking`) | map_server | particle filter (identity in sim) | identity | identity | pure_pursuit |
 
 ### 5.2 Deployment
@@ -383,7 +383,7 @@ src/
     ...                  # (planned) particle filter
   perception/        # opponent detection, ...
   planning/          # planners, ...
-  controller/        # rbsf_pure_pursuit, rbsf_wall_following, ...
+  controller/        # rbsf_pure_pursuit, rbsf_wall_following, rbsf_follow_the_gap, ...
   common/
     rbsf_identity/       # identity implementation of every slot
     rbsf_msgs/           # (planned) stack messages

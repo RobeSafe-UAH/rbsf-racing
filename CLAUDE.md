@@ -141,6 +141,9 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   tested yet.
 - [x] Wall-following controller (`rbsf_wall_following`), verified in MVSim and f1tenth_gym.
   Reworked to centre between both walls (2026-10-07), not yet re-verified in sim
+- [x] Follow-the-Gap controller (`rbsf_follow_the_gap`, `controller:=follow_the_gap`), the ForzaETH
+  mapping controller with static obstacle avoidance. Verified in f1tenth_gym (spielberg with
+  boxes on the line) and MVSim (iros2026 lap, Cartographer map passes inspection) (2026-10-07)
 - [x] Safety gate (`rbsf_safety` / `drive_gate`), verified in sim
 - [x] SLAM integration and map saving (mapping slot): DualSLAM (`rbsf_dual_slam`), verified in
   MVSim and f1tenth_gym. Cartographer does not close the start/finish loop on spielberg yet

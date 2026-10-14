@@ -29,6 +29,7 @@ IMPLEMENTATIONS = {
     'controller': {
         'identity': ('rbsf_identity', 'controller.launch.py'),
         'wall_following': ('rbsf_wall_following', 'wall_following.launch.py'),
+        'follow_the_gap': ('rbsf_follow_the_gap', 'follow_the_gap.launch.py'),
     },
 }
 

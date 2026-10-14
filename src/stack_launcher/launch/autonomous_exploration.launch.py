@@ -10,11 +10,13 @@ Slots (defaults, each overridable with <slot>:=<implementation>):
     localization  identity
     perception    identity
     planning      identity
-    controller    wall_following  (scan -> drive_gate/auto_cmd)
+    controller    wall_following  (scan -> drive_gate/auto_cmd; follow_the_gap also avoids static
+                                   obstacles, as in the ForzaETH mapping launch)
 
 Quick start:
     ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=levine
     ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth
+    ros2 launch stack_launcher autonomous_exploration.launch.py controller:=follow_the_gap
     ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real
 Save both maps (PGM + YAML for the offline map tools, plus each SLAM's own state) into
 maps/<YYYYMMDD_HHMMSS>/ with joystick button Y, or:

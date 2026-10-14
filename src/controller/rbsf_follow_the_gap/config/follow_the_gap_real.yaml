@@ -1,0 +1,44 @@
+# Follow-the-Gap parameters for the real car. Start slow and tune on the track. The wildcard
+# applies them to every namespaced instance (/r0/follow_the_gap, ...).
+/**:
+  ros__parameters:
+    # Beams used: |angle| <= fov / 2 (rad). The car cannot steer into a gap behind its side.
+    fov: 3.1416
+    # Planning horizon (m): longer ranges, and beams without a return, count as this.
+    max_range: 10.0
+    # Moving-mean window (beams) against noise. The result never exceeds the raw range, so a
+    # lone ray through a gap is shortened and an obstacle never moves away.
+    smoothing_window: 3
+    # Every point blocks the beams within asin(inflation_radius / r) of it: half the car's width
+    # plus a margin (m). Keep 2 * inflation_radius above the widest cone gap (~0.4 m on RoboRacer
+    # tracks), or the car aims between the cones of a boundary.
+    inflation_radius: 0.25
+    # A beam is free when its inflated range reaches the gap threshold (m):
+    # base_gap_threshold + speed_gain * speed (s), at most max_gap_threshold. Obstacles closer
+    # than this are avoided; a faster car looks further ahead. Keep base_gap_threshold above
+    # half the widest track section, or the walls beside the car count as free and it stops
+    # centring (the sim tracks are 1.6-3.5 m wide). Without a gap at base_gap_threshold the
+    # car stops.
+    base_gap_threshold: 2.0
+    speed_gain: 0.5
+    max_gap_threshold: 4.0
+    # Aim point in the largest gap: 'middle' (ForzaETH, steady for mapping) or 'deepest' (the
+    # farthest beam within the gap's middle deepest_fraction, cuts corners).
+    target_mode: middle
+    deepest_fraction: 0.5
+    # Pure-pursuit steering to the target at min(range, lookahead) (m), wheelbase (m).
+    lookahead: 2.0
+    wheelbase: 0.33
+    # Steering limit (rad), and low-pass weight of each new steering (1.0: no filter).
+    max_steering: 0.4189
+    steering_alpha: 0.7
+    # Speed (m/s): max_speed straight, min_speed at full lock, capped to stop stop_distance (m)
+    # before the target with max_decel (m/s^2). Never below min_speed while moving; 0 only when
+    # no gap fits the car. drive_gate clips it to its max_auto_speed.
+    max_speed: 1.2
+    # The motor does not turn the wheels below ~0.8 m/s (VESC deadband).
+    min_speed: 0.8
+    max_decel: 2.0
+    stop_distance: 0.3
+    # Publish follow_the_gap/scan (inflated) and follow_the_gap/markers (gap and target).
+    publish_debug: false

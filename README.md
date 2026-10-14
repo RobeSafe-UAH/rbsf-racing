@@ -86,7 +86,7 @@ side from the same scans.
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=spielberg
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth track:=spielberg
 #   robot:=r0  headless:=true  foxglove:=false  rviz:=false  joy:=false  require_deadman:=true
-#   mapping:=dual_slam|slam_toolbox|cartographer|identity ... controller:=wall_following
+#   mapping:=dual_slam|slam_toolbox|cartographer|identity ... controller:=wall_following|follow_the_gap
 
 # Save both maps (gamepad Y does the same):
 ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger
@@ -133,6 +133,14 @@ ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/
   then holds half the corridor width last measured with both walls (for up to 2 s), or 0.4 m,
   to the other wall. With both walls lost it holds its heading. Gains and distances are in
   `src/controller/rbsf_wall_following/config/wall_following_{sim,real}.yaml`.
+- `controller:=follow_the_gap` (`rbsf_follow_the_gap`, as in the ForzaETH mapping launch) drives
+  into the largest gap of the scan instead, so it also goes around static obstacles. Every
+  LiDAR point is inflated by the car's half-width (`inflation_radius`), which closes the gaps of
+  cone rows; a beam is free when its inflated range reaches the gap threshold (2 m, plus
+  0.5 s x speed). Keep that threshold above half the track width. With
+  `publish_debug: true` (default in sim) it shows the inflated scan on `/r0/follow_the_gap/scan`
+  and the gap and target on `/r0/follow_the_gap/markers`. Parameters are in
+  `src/controller/rbsf_follow_the_gap/config/follow_the_gap_{sim,real}.yaml`.
 - `levine` is a building floor with junctions that lead off the loop: the car explores them.
   Use `iros2026` or `spielberg` for a closed lap.
 - In simulation the car drives without a joystick (`require_deadman` defaults to `false`). With
