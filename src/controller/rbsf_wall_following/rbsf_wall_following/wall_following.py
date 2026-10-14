@@ -19,6 +19,8 @@ import math
 
 import numpy as np
 
+FOLLOW_SIDES = ('centre', 'left', 'right')
+
 
 def scan_points(ranges, angle_min, angle_increment, range_max):
     """(x, y) arrays of the valid returns (finite, positive, below range_max) of a scan."""
@@ -72,6 +74,20 @@ class WallFollower:
     far bins (a far bin without a boundary within max_wall_distance drops that side's term).
     Steering = distance PI + orientation PI.
 
+    follow_side 'left' / 'right' follows one boundary instead: the inner one of a loop driven
+    counter-clockwise / clockwise. Centring fails where the corridor widens into a bay off the
+    loop (the car centres into the bay); the inner boundary always leads around the loop. The
+    car holds min(side_distance, half the corridor width) to that side, the width measured this
+    scan or remembered (younger than width_memory), so it still centres in narrow sections.
+    The side is followed while it is within side_capture_distance; farther, the car centres as
+    above (a far wall on that side may be the back of an alcove, not the way on). When the
+    followed boundary ends (lost within wall_end_memory s of last being followed: a hairpin
+    around the end of the inner wall), the car turns towards it at full lock, but only while
+    that U-turn fits: the full-lock half circle towards that side, then lookahead m straight
+    back, clear of scan points by path_half_width. A doorway or a short alcove fails the test,
+    and the car centres past it. The turn goes on until the side is followed again or it no
+    longer fits.
+
     Corners: a front term takes over as the free distance in the car's path drops from
     corner_distance to corner_min_distance (linear blend, full lock at the minimum), towards the
     more open side just before the obstacle (bin x in [front - bin_length, front - front_margin],
@@ -83,7 +99,9 @@ class WallFollower:
     def __init__(self, distance_pi, orientation_pi, max_steering, bin_length=1.0,
                  lookahead=1.2, path_half_width=0.3, front_margin=0.2, min_points=3,
                  max_wall_distance=math.inf, fallback_distance=0.4, width_memory=0.0,
-                 corner_distance=0.0, corner_min_distance=0.0):
+                 corner_distance=0.0, corner_min_distance=0.0, follow_side='centre',
+                 side_distance=0.8, side_capture_distance=1.2, wall_end_memory=0.5,
+                 wheelbase=0.3302):
         if fallback_distance <= 0.0:
             raise ValueError('fallback_distance must be positive')
         if width_memory < 0.0:
@@ -94,6 +112,13 @@ class WallFollower:
             raise ValueError('min_points must be at least 1')
         if corner_distance > 0.0 and not 0.0 <= corner_min_distance < corner_distance:
             raise ValueError('corner_min_distance must be in [0, corner_distance)')
+        if follow_side not in FOLLOW_SIDES:
+            raise ValueError(f'follow_side must be one of {FOLLOW_SIDES}')
+        if follow_side != 'centre' and not 0.0 < side_distance <= side_capture_distance:
+            raise ValueError('following one side needs 0 < side_distance <= '
+                             'side_capture_distance')
+        if wall_end_memory < 0.0 or wheelbase <= 0.0:
+            raise ValueError('wall_end_memory must be non-negative and wheelbase positive')
         self.distance_pi = distance_pi
         self.orientation_pi = orientation_pi
         self.max_steering = abs(max_steering)
@@ -107,8 +132,15 @@ class WallFollower:
         self.width_memory = width_memory
         self.corner_distance = corner_distance
         self.corner_min_distance = corner_min_distance
+        self.follow_side = follow_side
+        self.side_distance = side_distance
+        self.side_capture_distance = side_capture_distance
+        self.wall_end_memory = wall_end_memory
+        self.turn_radius = wheelbase / math.tan(self.max_steering)
         self.width = None
         self.width_age = 0.0
+        self.side_age = math.inf
+        self.rounding = False
 
     def corner_weight(self, front):
         """0 with the front clear (>= corner_distance), 1 at corner_min_distance or closer."""
@@ -122,6 +154,22 @@ class WallFollower:
         if self.width is not None and self.width_age <= self.width_memory:
             return 0.5 * self.width
         return self.fallback_distance
+
+    def side_target(self):
+        """Distance to hold to the followed side: side_distance, capped by half the width."""
+        fresh = self.width is not None and self.width_age <= self.width_memory
+        return min(self.side_distance, 0.5 * self.width) if fresh else self.side_distance
+
+    def u_turn_fits(self, x, y, sign):
+        """Whether the full-lock U-turn towards `sign` (+1 left) and lookahead m back is clear."""
+        r = self.turn_radius
+        phi = np.linspace(0.0, math.pi, 13)
+        back = np.linspace(0.0, self.lookahead, 7)
+        px = np.concatenate((r * np.sin(phi), -back))
+        py = sign * np.concatenate((r * (1.0 - np.cos(phi)), np.full(back.size, 2.0 * r)))
+        blocked = ((x[:, None] - px) ** 2 + (y[:, None] - py) ** 2
+                   < self.path_half_width ** 2).any(axis=1)
+        return np.count_nonzero(blocked) < self.min_points
 
     def front_distance(self, x, y):
         """Free distance ahead: nearest x of the points in the car's path."""
@@ -157,27 +205,51 @@ class WallFollower:
         d_right, oe_right, right, right_oe, open_right = sides['right']
 
         if left and right:
-            distance_error = 0.5 * (d_left - d_right)
             self.width, self.width_age = d_left + d_right, 0.0
+        elif math.isfinite(dt) and dt > 0.0:
+            self.width_age += dt
+
+        oriented = ((oe_left, left and left_oe), (oe_right, right and right_oe))
+        followed = {'left': (1.0, d_left, left), 'right': (-1.0, d_right, right)}
+        sign, d_side, side_visible = followed.get(self.follow_side, (0.0, math.inf, False))
+        followed_now = side_visible and d_side <= self.side_capture_distance
+        if followed_now:
+            self.side_age, self.rounding = 0.0, False
+        elif math.isfinite(dt) and dt > 0.0:
+            self.side_age += dt
+        self.rounding = sign != 0.0 and not followed_now \
+            and (self.rounding or self.side_age <= self.wall_end_memory) \
+            and self.u_turn_fits(x, y, sign)
+        if self.rounding:
+            # Around the end of the followed boundary; the PIs are skipped (integrals frozen).
+            return sign * self.max_steering
+
+        if followed_now:
+            distance_error = sign * (d_side - self.side_target())
+        elif left and right:
+            distance_error = 0.5 * (d_left - d_right)
+        elif left:
+            distance_error = d_left - self.target_distance()
+        elif right:
+            distance_error = self.target_distance() - d_right
         else:
-            if math.isfinite(dt) and dt > 0.0:
-                self.width_age += dt
-            if left:
-                distance_error = d_left - self.target_distance()
-            elif right:
-                distance_error = self.target_distance() - d_right
-            else:
-                distance_error = None
+            distance_error = None
 
         follow = 0.0
         if distance_error is not None:
             follow = self.distance_pi.update(distance_error, dt)
-            orientations = [oe for oe, ok in ((oe_left, left and left_oe),
-                                              (oe_right, right and right_oe)) if ok]
+            orientations = [oe for oe, ok in oriented if ok]
             if orientations:
                 follow += self.orientation_pi.update(sum(orientations) / len(orientations), dt)
 
-        corner_turn = self.max_steering if open_left >= open_right else -self.max_steering
+        if self.follow_side == 'centre':
+            turn_left = open_left >= open_right
+        else:
+            # Prefer the followed side while it leaves room (the hairpin around the inner wall's
+            # end), else the more open side (a bend away from it).
+            turn_left = (open_left >= self.side_distance) if self.follow_side == 'left' \
+                else (open_right < self.side_distance)
+        corner_turn = self.max_steering if turn_left else -self.max_steering
         weight = self.corner_weight(front)
         steering = (1.0 - weight) * follow + weight * corner_turn
         return max(-self.max_steering, min(self.max_steering, steering))

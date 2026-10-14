@@ -39,3 +39,7 @@
     # before the obstacle.
     corner_distance: 1.5
     corner_min_distance: 0.7
+    # Follow the inner boundary: 'left' for a counter-clockwise lap, 'right' for clockwise,
+    # 'centre' to centre between both walls (see wall_following_sim.yaml).
+    follow_side: left
+    side_distance: 0.6

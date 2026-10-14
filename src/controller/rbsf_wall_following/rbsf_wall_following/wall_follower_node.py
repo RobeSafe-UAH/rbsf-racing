@@ -24,6 +24,8 @@ Algorithm, on every scan (see wall_following.py):
        Speed is the constant `speed`.
     5. Corners: as the front distance drops from corner_distance to corner_min_distance, blend
        linearly into full lock towards the side that is more open just before the obstacle.
+With follow_side left/right, step 3 follows that side (the inner boundary of the lap) instead:
+hold min(side_distance, half the corridor width) to it, and turn towards it once it is lost.
 """
 
 from ackermann_msgs.msg import AckermannDriveStamped
@@ -57,6 +59,11 @@ class WallFollowerNode(Node):
         self.declare_parameter('width_memory', 2.0)
         self.declare_parameter('corner_distance', 1.5)
         self.declare_parameter('corner_min_distance', 0.7)
+        self.declare_parameter('follow_side', 'centre')
+        self.declare_parameter('side_distance', 0.8)
+        self.declare_parameter('side_capture_distance', 1.2)
+        self.declare_parameter('wall_end_memory', 0.5)
+        self.declare_parameter('wheelbase', 0.3302)
 
         param = lambda name: self.get_parameter(name).value  # noqa: E731
         self.speed = float(param('speed'))
@@ -76,10 +83,19 @@ class WallFollowerNode(Node):
             width_memory=float(param('width_memory')),
             corner_distance=float(param('corner_distance')),
             corner_min_distance=float(param('corner_min_distance')),
+            follow_side=str(param('follow_side')),
+            side_distance=float(param('side_distance')),
+            side_capture_distance=float(param('side_capture_distance')),
+            wall_end_memory=float(param('wall_end_memory')),
+            wheelbase=float(param('wheelbase')),
         )
-        self.get_logger().info(
-            f"Centring between the walls (fallback {param('fallback_distance')} m to a lone "
-            f'wall), {self.speed} m/s')
+        if self.follower.follow_side == 'centre':
+            mode = f"Centring between the walls (fallback {param('fallback_distance')} m to a " \
+                'lone wall)'
+        else:
+            mode = f"Following the {param('follow_side')} wall at up to " \
+                f"{param('side_distance')} m"
+        self.get_logger().info(f'{mode}, {self.speed} m/s')
 
         self.previous_stamp = None
         self.drive_pub = self.create_publisher(AckermannDriveStamped, 'drive_gate/auto_cmd', 10)

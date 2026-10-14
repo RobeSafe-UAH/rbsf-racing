@@ -41,3 +41,9 @@
     # before the obstacle.
     corner_distance: 1.5
     corner_min_distance: 0.7
+    # Which boundary to follow: 'centre' (both), or 'left' / 'right', the inner boundary of a lap
+    # driven counter-clockwise / clockwise. Centring drives into bays that open off the loop
+    # (eps_oval_single_wall); the inner boundary always leads around it. One side holds
+    # min(side_distance, half the corridor width) to it, and turns towards it when it ends.
+    follow_side: left
+    side_distance: 0.6

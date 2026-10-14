@@ -1,0 +1,7 @@
+image: eps_oval_single_wall.png
+resolution: 0.05000000074505806
+origin: [-4.479070281982422, -1.7713653564453127, 0.0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
+centerline: eps_oval_single_wall_centerline.csv
