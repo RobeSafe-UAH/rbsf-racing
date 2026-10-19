@@ -98,6 +98,13 @@ def test_largest_gap_tie_prefers_the_heading():
     assert largest_gap(f, heading=0) == (0, 2)
 
 
+def test_largest_gap_hysteresis_keeps_the_last_gap():
+    f = np.array([1, 1, 1, 0, 1, 1, 0, 0], dtype=bool)
+    assert largest_gap(f, keep=4) == (0, 3)
+    assert largest_gap(f, keep=4, hysteresis=2.0) == (4, 6)
+    assert largest_gap(f, keep=7, hysteresis=2.0) == (0, 3)
+
+
 @pytest.mark.parametrize('seed', range(10))
 def test_inflation_matches_brute_force(seed):
     rng = np.random.default_rng(seed)
@@ -185,6 +192,53 @@ def test_boxed_in_stops():
     assert cmd.speed == 0.0 and cmd.target_angle is None
 
 
+def test_wall_closer_than_the_radius_leaves_the_way_ahead_free():
+    # 0.2 m from the left wall, inside the 0.25 m radius: the radius shrinks below 0.2 m, so the
+    # wall does not block the 90 degrees beside it, and the beams ahead stay open.
+    controller = ftg()
+    cmd = drive(controller, cast(corridor(0.2, 2.0)))
+    assert controller.inflated[controller.layout.heading] > 5.0
+    assert cmd.speed > 0.0 and cmd.steering < 0.0
+
+
+def test_without_a_gap_at_the_threshold_the_deepest_reachable_beams_are_taken():
+    # A room 1.6 m ahead and to the left: nothing reaches 2.5 m, but the front-left corner is
+    # deep enough to turn to, so the car goes on towards it instead of stopping.
+    cmd = drive(ftg(base_gap_threshold=2.5, max_gap_threshold=2.5),
+                cast(box(-1.0, 1.6, -1.0, 1.6)))
+    assert cmd.target_angle is not None and cmd.speed > 0.0
+    assert cmd.target_angle > 0.0 and cmd.steering > 0.0
+    assert cmd.threshold < 2.5
+
+
+def test_beams_beside_the_car_are_out_of_reach():
+    # A dead end 0.7 m ahead, walls 1.2 m to each side: the beams towards the sides are the
+    # deepest, but an arc to them needs a turning radius below the car's, so the car stops.
+    cmd = drive(ftg(), cast(box(-2.0, 0.7, -1.2, 1.2)))
+    assert cmd.speed == 0.0 and cmd.target_angle is None
+
+
+@pytest.mark.parametrize('fraction', [0.25, 0.75])
+def test_target_fraction_leans_towards_one_edge_of_the_gap(fraction):
+    cmd = drive(ftg(target_fraction=fraction), cast(corridor(1.5, 1.5)))
+    assert np.sign(cmd.target_angle) == np.sign(fraction - 0.5)
+    assert np.sign(cmd.steering) == np.sign(fraction - 0.5)
+
+
+def test_gap_hysteresis_keeps_the_side_around_a_centred_obstacle():
+    # A box in the middle of a 3 m corridor leaves two gaps of the same size. Once the car has
+    # picked one, a small shift that makes the other side wider only switches it without
+    # hysteresis.
+    walls = corridor(1.5, 1.5)
+    centred = cast(walls + box(1.2, 1.5, -0.3, 0.3))
+    side = np.sign(drive(ftg(speed_gain=0.0), centred).target_angle)
+    shifted = cast(walls + box(1.2, 1.5, -0.3 + 0.1 * side, 0.3 + 0.1 * side))
+    for hysteresis, expected in ((1.0, -side), (2.0, side)):
+        controller = ftg(speed_gain=0.0, gap_hysteresis=hysteresis)
+        drive(controller, centred)
+        assert np.sign(drive(controller, shifted).target_angle) == expected
+
+
 def test_speed_never_below_min_speed_while_moving():
     # A narrow corridor turning left: the steering saturates, the speed stays at min_speed.
     cmd = drive(ftg(min_speed=0.8, max_speed=1.2, lookahead=0.8), cast(corridor(0.8, 0.8, 0.6)))
@@ -224,6 +278,14 @@ def test_invalid_parameters_raise():
         ftg(min_speed=3.0, max_speed=2.0)
     with pytest.raises(ValueError):
         ftg(base_gap_threshold=5.0, max_gap_threshold=4.0)
+    with pytest.raises(ValueError):
+        ftg(target_fraction=1.5)
+    with pytest.raises(ValueError):
+        ftg(gap_hysteresis=0.5)
+    with pytest.raises(ValueError):
+        ftg(fallback_ratio=0.0)
+    with pytest.raises(ValueError):
+        ftg(min_gap_threshold=0.0)
 
 
 def test_deepest_target_mode_aims_further_into_a_corner():

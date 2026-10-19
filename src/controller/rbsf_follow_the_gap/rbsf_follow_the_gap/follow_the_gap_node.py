@@ -17,10 +17,13 @@ Algorithm, on every scan (see follow_the_gap.py):
     1. Beams inside the field of view; no return is open space at max_range (the horizon).
     2. Moving-mean smoothing, never above the raw range.
     3. Inflate every point by asin(inflation_radius / r) on each side: gaps must fit the car,
-       and cone rows close into walls.
+       and cone rows close into walls. Next to a wall the radius shrinks below its distance.
     4. Free beams reach the gap threshold, which grows with the speed. The largest run of free
-       beams is the gap; with none the car stops.
-    5. Target the middle of the gap; pure-pursuit steering to it, low-passed and clipped.
+       beams is the gap, the one of the last target preferred (gap_hysteresis); with none, the
+       deepest beams; with none of those either, the car stops.
+    5. Target target_fraction of the way across the gap (0.5: the middle, more: towards the
+       inner side of a counter-clockwise lap); pure-pursuit steering to it, low-passed and
+       clipped.
     6. Speed from max_speed (straight) down to min_speed (full lock), capped to stop before the
        target, and never below min_speed while moving.
 """
@@ -54,6 +57,10 @@ PARAMETERS = {
     'min_speed': 0.5,
     'max_decel': 3.0,
     'stop_distance': 0.3,
+    'min_gap_threshold': 1.0,
+    'fallback_ratio': 0.8,
+    'target_fraction': 0.5,
+    'gap_hysteresis': 1.0,
 }
 
 # Points of the debug gap arc (the arc is subsampled, not one point per beam).

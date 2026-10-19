@@ -140,10 +140,14 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
 - [x] Hardware bringup (`rbsf_bringup`) and MVSim simulation packages. The real car is not
   tested yet.
 - [x] Wall-following controller (`rbsf_wall_following`), verified in MVSim and f1tenth_gym.
-  Reworked to centre between both walls (2026-10-07), not yet re-verified in sim
+  Default `follow_side: left` explores eps_oval_single_wall in both sims with DualSLAM (maps
+  pass inspection, 2026-10-19). Known gaps: crashes on levine's inner-wall recess, and on eps
+  with 80 ms of extra steering lag (passes up to 60 ms)
 - [x] Follow-the-Gap controller (`rbsf_follow_the_gap`, `controller:=follow_the_gap`), the ForzaETH
   mapping controller with static obstacle avoidance. Verified in f1tenth_gym (spielberg with
-  boxes on the line) and MVSim (iros2026 lap, Cartographer map passes inspection) (2026-10-07)
+  boxes on the line) and MVSim (iros2026 lap, Cartographer map passes inspection) (2026-10-07).
+  Gap fallback, near-wall inflation, gap hysteresis and `target_fraction` (inner-side lean) added
+  so it explores eps_oval_single_wall in both sims with DualSLAM (2026-10-19)
 - [x] Safety gate (`rbsf_safety` / `drive_gate`), verified in sim
 - [x] SLAM integration and map saving (mapping slot): DualSLAM (`rbsf_dual_slam`), verified in
   MVSim and f1tenth_gym. Cartographer does not close the start/finish loop on spielberg yet

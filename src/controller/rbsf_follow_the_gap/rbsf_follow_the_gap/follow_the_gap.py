@@ -13,15 +13,26 @@ is computed once (Layout).
        through a gap is shortened, an obstacle never moves away).
     3. Inflate: a point at range r blocks every beam within asin(inflation_radius / r) of it
        (the disc around it), so a gap must fit the car, and the gaps of a cone row (narrower
-       than 2 inflation_radius) close. See Inflation.
+       than 2 inflation_radius) close. See Inflation. A point closer than the radius would
+       block 90 degrees on each side, the beams pointing away from it too, so the radius
+       shrinks to NEAR_FACTOR times the nearest range: next to a wall, the car can still
+       steer away from it.
     4. Gap: the beams of the field of view whose inflated range reaches the gap threshold
        (base_gap_threshold + speed_gain * last speed, at most max_gap_threshold) are free. The
        threshold must exceed half the track width, or the walls beside the car count as free
        and the gap spans the whole field of view. The largest run of free beams is the gap
-       (ties: the one nearest the heading). Without a gap at that threshold, the base threshold
-       is tried; without one there either, the car stops.
-    5. Target: the middle beam of the gap (or, with target_mode 'deepest', the farthest beam of
-       its middle deepest_fraction), at distance min(range, lookahead).
+       (ties: the one nearest the heading); the run holding the last target counts
+       gap_hysteresis times its length, so the car does not switch sides in front of a
+       centred obstacle. Without a gap at that threshold, the base threshold is tried, then
+       fallback_ratio times the deepest inflated range (at least min_gap_threshold) among the
+       beams the car can turn to and stop before (range >= 2 turning radius |sin angle| +
+       stop_distance): in a tight bend, or stopped in front of an obstacle, the car takes the
+       deepest of them instead of stopping for good. Without a gap there either, it stops.
+    5. Target: the beam at target_fraction of the gap, from its right edge (0) to its left edge
+       (1), 0.5 being the middle (or, with target_mode 'deepest', the farthest beam within
+       deepest_fraction of the gap around it), at distance min(range, lookahead). Above 0.5 the
+       car keeps to the inner side of a counter-clockwise lap, away from dead-end bays on the
+       outside of the bends.
     6. Steering: pure pursuit to the target, atan(2 wheelbase sin(alpha) / distance), low-passed
        with steering_alpha and clipped to max_steering.
     7. Speed: linear from max_speed (straight) to min_speed (full lock), capped so the car can
@@ -39,6 +50,8 @@ from scipy.ndimage import uniform_filter1d
 # its edges (the next cone of a row) still block the edge beams. Narrow enough to leave out the
 # rear beams that may hit the car itself.
 INFLATION_MARGIN = math.pi / 6
+# A point closer than the inflation radius shrinks it to this fraction of its range.
+NEAR_FACTOR = 0.9
 
 Command = namedtuple('Command', [
     'speed', 'steering',
@@ -94,20 +107,24 @@ class Inflation:
         self.levels = int(self.log2[size]) + 1
         self.table = np.empty((self.levels, size), dtype=np.float32)
 
-    def half_widths(self, ranges):
+    def half_widths(self, ranges, scale=1.0):
         """Beams blocked on each side of a point at each range (at least 1, at most 90 deg)."""
-        k = 1 + self.full - np.searchsorted(self.ranges_for_width, ranges, side='right')
+        k = 1 + self.full - np.searchsorted(self.ranges_for_width, ranges / scale, side='right')
         return np.minimum(k, self.full, out=k)
 
-    def __call__(self, ranges, max_range):
-        """Inflated copy of `ranges` (float32, size beams). Ranges >= max_range are open space."""
+    def __call__(self, ranges, max_range, scale=1.0):
+        """
+        Inflated copy of `ranges` (float32, size beams). Ranges >= max_range are open space.
+
+        `scale` shrinks the radius (scale * radius) without rebuilding the lookup table.
+        """
         n = self.size
         inflated = ranges.copy()
         points = np.flatnonzero(ranges < max_range)
         if points.size == 0:
             return inflated
         values = ranges[points]
-        k = self.half_widths(values)
+        k = self.half_widths(values, scale)
         lo = np.maximum(points - k, 0)
         hi = np.minimum(points + k, n - 1)
         p = self.log2[hi - lo + 1]
@@ -126,16 +143,24 @@ class Inflation:
         return np.minimum(inflated, table[0], out=inflated)
 
 
-def largest_gap(free, heading=0):
-    """(start, stop) of the longest run of True in `free` (ties: nearest `heading`), or None."""
+def largest_gap(free, heading=0, keep=None, hysteresis=1.0):
+    """
+    (start, stop) of the longest run of True in `free` (ties: nearest `heading`), or None.
+
+    The run containing beam `keep` (the last target) counts `hysteresis` times its length, so the
+    car does not switch between two gaps of about the same size (around a centred obstacle).
+    """
     edges = np.diff(np.concatenate(([0], free.view(np.int8), [0])))
     starts = np.flatnonzero(edges == 1)
     if starts.size == 0:
         return None
     stops = np.flatnonzero(edges == -1)
+    lengths = (stops - starts).astype(float)
+    if keep is not None:
+        lengths[(starts <= keep) & (keep < stops)] *= hysteresis
     # Lengths are integers: a tie-break below 1 never beats a longer run.
     distance = np.abs(starts + stops - 1 - 2 * heading) / (2.0 * free.size + 2.0)
-    best = int(np.argmax((stops - starts) - distance))
+    best = int(np.argmax(lengths - distance))
     return int(starts[best]), int(stops[best])
 
 
@@ -146,7 +171,8 @@ class FollowTheGap:
                  base_gap_threshold=2.0, speed_gain=0.5, max_gap_threshold=4.0,
                  target_mode='middle', deepest_fraction=0.5, lookahead=2.0, wheelbase=0.33,
                  max_steering=0.4189, steering_alpha=1.0, max_speed=2.0, min_speed=0.5,
-                 max_decel=3.0, stop_distance=0.3):
+                 max_decel=3.0, stop_distance=0.3, min_gap_threshold=1.0,
+                 fallback_ratio=0.8, target_fraction=0.5, gap_hysteresis=1.0):
         if fov <= 0.0 or max_range <= 0.0 or inflation_radius <= 0.0:
             raise ValueError('fov, max_range and inflation_radius must be positive')
         if not 0.0 < base_gap_threshold <= max_gap_threshold:
@@ -159,6 +185,10 @@ class FollowTheGap:
             raise ValueError('Need 0 <= min_speed <= max_speed and a positive max_decel')
         if lookahead <= 0.0 or wheelbase <= 0.0 or max_steering <= 0.0:
             raise ValueError('lookahead, wheelbase and max_steering must be positive')
+        if min_gap_threshold <= 0.0 or not 0.0 < fallback_ratio <= 1.0:
+            raise ValueError('min_gap_threshold must be positive and fallback_ratio in (0, 1]')
+        if not 0.0 <= target_fraction <= 1.0 or gap_hysteresis < 1.0:
+            raise ValueError('target_fraction must be in [0, 1] and gap_hysteresis at least 1')
         self.fov = fov
         self.max_range = max_range
         self.smoothing_window = int(smoothing_window)
@@ -176,6 +206,11 @@ class FollowTheGap:
         self.min_speed = min_speed
         self.max_decel = max_decel
         self.stop_distance = stop_distance
+        self.min_gap_threshold = min_gap_threshold
+        self.fallback_ratio = fallback_ratio
+        self.target_fraction = target_fraction
+        self.gap_hysteresis = gap_hysteresis
+        self.target = None  # beam of the last target in the field of view, None after a stop
         self.layout = None
         self.speed = 0.0
         self.steering = 0.0
@@ -188,13 +223,25 @@ class FollowTheGap:
         if layout is None or layout.key != (ranges.size, angle_min, angle_increment):
             layout = self.layout = Layout(ranges.size, angle_min, angle_increment, self.fov,
                                           self.inflation_radius)
+            turn_radius = self.wheelbase / math.tan(self.max_steering)
+            layout.reach = 2.0 * turn_radius * np.abs(np.sin(layout.angles)) + self.stop_distance
         r = ranges[layout.start:layout.stop].copy()
         # NaN compares False everywhere, so `~(r > 0)` catches it with 0 and negatives.
         r[~(r > 0.0) | (r >= range_max)] = self.max_range
         np.minimum(r, self.max_range, out=r)
         if self.smoothing_window > 1:
             np.minimum(r, uniform_filter1d(r, self.smoothing_window, mode='nearest'), out=r)
-        return layout.inflate(r, self.max_range)[layout.fov_start:layout.fov_stop]
+        # Closer to a point than the radius, its disc would cover 90 degrees on each side, beams
+        # pointing away from it too: shrink the radius below the nearest range instead.
+        nearest = float(r.min())
+        scale = min(1.0, NEAR_FACTOR * nearest / self.inflation_radius)
+        return layout.inflate(r, self.max_range, scale)[layout.fov_start:layout.fov_stop]
+
+    def find_gap(self, threshold, ranges=None):
+        """Largest gap of `ranges` (the inflated scan) at `threshold`, near the last target."""
+        ranges = self.inflated if ranges is None else ranges
+        return largest_gap(ranges >= threshold, self.layout.heading, self.target,
+                           self.gap_hysteresis)
 
     def update(self, ranges, angle_min, angle_increment, range_max):
         """Process one scan and return the Command (speed in m/s, steering in rad, left +)."""
@@ -204,23 +251,34 @@ class FollowTheGap:
 
         threshold = min(self.max_gap_threshold,
                         self.base_gap_threshold + self.speed_gain * self.speed)
-        gap = largest_gap(inflated >= threshold, layout.heading)
+        gap = self.find_gap(threshold)
         if gap is None and threshold > self.base_gap_threshold:
             threshold = self.base_gap_threshold
-            gap = largest_gap(inflated >= threshold, layout.heading)
+            gap = self.find_gap(threshold)
+        if gap is None:
+            # A tight bend, or stopped in front of an obstacle: the deepest beams the car can
+            # turn to and still stop before (an arc to range r at angle a needs r >= 2 turning
+            # radius |sin a|, plus stop_distance).
+            reachable = np.where(inflated >= layout.reach, inflated, 0.0)
+            threshold = max(self.min_gap_threshold, self.fallback_ratio * float(reachable.max()))
+            gap = self.find_gap(threshold, reachable)
         if gap is None:
             # Boxed in: stop (drive_gate holds it), wheels towards the most open beam.
             self.speed = 0.0
+            self.target = None
             self.steering = math.copysign(
                 self.max_steering, float(layout.angles[int(np.argmax(inflated))]))
             return Command(0.0, self.steering, None, None, None, None, threshold)
 
         start, stop = gap
+        centre = start + int(round(self.target_fraction * (stop - start - 1)))
         if self.target_mode == 'middle':
-            target = (start + stop - 1) // 2
+            target = centre
         else:
-            margin = int(0.5 * (1.0 - self.deepest_fraction) * (stop - start))
-            target = start + margin + int(np.argmax(inflated[start + margin:stop - margin]))
+            half = max(1, int(0.5 * self.deepest_fraction * (stop - start)))
+            lo, hi = max(start, centre - half), min(stop, centre + half + 1)
+            target = lo + int(np.argmax(inflated[lo:hi]))
+        self.target = target
         alpha = float(layout.angles[target])
         distance = min(float(inflated[target]), self.lookahead)
 

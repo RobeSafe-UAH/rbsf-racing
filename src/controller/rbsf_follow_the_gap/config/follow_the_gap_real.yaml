@@ -15,19 +15,31 @@
     inflation_radius: 0.25
     # A beam is free when its inflated range reaches the gap threshold (m):
     # base_gap_threshold + speed_gain * speed (s), at most max_gap_threshold. Obstacles closer
-    # than this are avoided; a faster car looks further ahead. Keep base_gap_threshold above
-    # half the widest track section, or the walls beside the car count as free and it stops
-    # centring (the sim tracks are 1.6-3.5 m wide). Without a gap at base_gap_threshold the
-    # car stops.
-    base_gap_threshold: 2.0
-    speed_gain: 0.5
-    max_gap_threshold: 4.0
+    # than this are avoided; a faster car looks further ahead. Keep it above half the usual
+    # track width, or the walls beside the car count as free and it stops centring, but below
+    # the depth of dead-end bays (at 2 m the car drives into the bay beside eps_oval's thin
+    # wall in sim). Fixed at 1.5 m, as in sim.
+    base_gap_threshold: 1.5
+    speed_gain: 0.0
+    max_gap_threshold: 1.5
+    # Without a gap at base_gap_threshold, the threshold drops to fallback_ratio * the deepest
+    # inflated range, but not below min_gap_threshold (m). Without a gap there either, the car
+    # stops.
+    min_gap_threshold: 0.6
+    fallback_ratio: 0.8
+    # The gap holding the last target counts gap_hysteresis times its width, so the car does
+    # not switch sides in front of a centred obstacle.
+    gap_hysteresis: 2.0
     # Aim point in the largest gap: 'middle' (ForzaETH, steady for mapping) or 'deepest' (the
-    # farthest beam within the gap's middle deepest_fraction, cuts corners).
+    # farthest beam within deepest_fraction of the gap around the middle, cuts corners).
+    # target_fraction moves the middle from the gap's right edge (0) to its left edge (1):
+    # 0.75 leans towards the inner side of a counter-clockwise lap, away from bays on the
+    # outside of bends (eps_oval). Verified in sim only.
     target_mode: middle
     deepest_fraction: 0.5
+    target_fraction: 0.75
     # Pure-pursuit steering to the target at min(range, lookahead) (m), wheelbase (m).
-    lookahead: 2.0
+    lookahead: 1.2
     wheelbase: 0.33
     # Steering limit (rad), and low-pass weight of each new steering (1.0: no filter).
     max_steering: 0.4189
