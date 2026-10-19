@@ -2,8 +2,8 @@
 Behaviour: autonomous exploration.
 
 The car drives on its own, centred between the walls, while the mapping slot builds the map (legacy
-02_autonomous_slam). By default the mapper is DualSLAM: SLAM Toolbox (owns /map and
-map -> <robot>/odom) and Cartographer (on /<robot>/mapping/cartographer/map) side by side.
+02_autonomous_slam). By default the mapper is DualSLAM: Cartographer (owns /map and
+map -> <robot>/odom) and SLAM Toolbox (on /<robot>/mapping/slam_toolbox/map) side by side.
 
 Slots (defaults, each overridable with <slot>:=<implementation>):
     mapping       dual_slam       (slam_toolbox, cartographer or identity also work)

@@ -114,11 +114,11 @@ at a glance.
 - **Simulators with ground truth.** Mapping and localization are both identity. The identity
   mapping publishes the identity `map -> <ns>/odom` (exact, since sim odometry is ground truth).
 
-**DualSLAM** (`rbsf_dual_slam/dual_slam.launch.py`) runs SLAM Toolbox and Cartographer on the
-same scans. Only the primary (SLAM Toolbox) owns `/map` and `map -> <ns>/odom`. Cartographer
-runs with `publish_to_tf = false` and publishes `/<ns>/mapping/cartographer/map` in its own frame
-`<ns>/cartographer/map`. `map_overlay` hangs that frame below `map` with a least-squares fit of
-the two trajectories. It is a leaf frame, so the single-owner rule holds. One `map_saver` saves
+**DualSLAM** (`rbsf_dual_slam/dual_slam.launch.py`) runs Cartographer and SLAM Toolbox on the
+same scans. Only the primary (Cartographer, the better mapper in sim and on the car) owns `/map`
+and `map -> <ns>/odom`. SLAM Toolbox publishes no TF and maps on
+`/<ns>/mapping/slam_toolbox/map` in its own frame `<ns>/slam_toolbox/map`. `map_overlay` hangs
+that frame below `map` with a least-squares fit of the two trajectories. It is a leaf frame, so the single-owner rule holds. One `map_saver` saves
 both maps (§4.1).
 
 ### 3.3 Identity components

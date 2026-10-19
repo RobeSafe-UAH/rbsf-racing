@@ -93,6 +93,14 @@ def load_session(session_dir):
     return session, maps
 
 
+def from_map_frame(xy, pose):
+    """Inverse of to_map_frame: points of `map` expressed in the frame whose pose is `pose`."""
+    x, y, yaw = pose
+    c, s = math.cos(yaw), math.sin(yaw)
+    dx, dy = np.asarray(xy, float)[:, 0] - x, np.asarray(xy, float)[:, 1] - y
+    return np.c_[c * dx + s * dy, -s * dx + c * dy]
+
+
 def to_map_frame(xy, pose):
     """Points of a map frame expressed in `map`, given that frame's pose (x, y, yaw) in map."""
     x, y, yaw = pose
@@ -108,9 +116,16 @@ def color(name, index):
 # Ground truth (simulators) -------------------------------------------------------------------
 
 class GroundTruth:
-    """The session track's map from rbsf_worlds and the recorded ground-truth path."""
+    """
+    The session track's map from rbsf_worlds and the recorded ground-truth path.
 
-    def __init__(self, map_yaml, path_csv):
+    Both are in the simulator's world frame, whose pose in `map` is `pose_in_map` (the session's
+    ground_truth_pose_in_map; identity for older sessions, whose primary SLAM anchored `map` at
+    the world origin). Every method takes and returns `map` coordinates.
+    """
+
+    def __init__(self, map_yaml, path_csv, pose_in_map=(0.0, 0.0, 0.0)):
+        self.pose_in_map = tuple(pose_in_map)
         spec = yaml.safe_load(map_yaml.read_text())
         img = cv2.imread(str(map_yaml.parent / spec['image']), cv2.IMREAD_GRAYSCALE)
         occupied = (255 - img.astype(float)) / 255.0 > spec['occupied_thresh']
@@ -125,10 +140,11 @@ class GroundTruth:
     def wall_points(self):
         rows, cols = np.nonzero(self.walls)
         scale, offset = pixel_frame(self.shape[0], self.resolution, self.origin)
-        return np.c_[cols, rows] * scale + offset
+        return to_map_frame(np.c_[cols, rows] * scale + offset, self.pose_in_map)
 
     def wall_error(self, points):
         """Distance (m) of map-frame points to the nearest ground-truth wall."""
+        points = from_map_frame(points, self.pose_in_map)
         scale, offset = pixel_frame(self.shape[0], self.resolution, self.origin)
         cols, rows = np.round((points - offset) / scale).astype(int).T
         ok = (rows >= 0) & (rows < self.shape[0]) & (cols >= 0) & (cols < self.shape[1])
@@ -139,7 +155,7 @@ class GroundTruth:
         gt = self.path[np.argsort(self.path[:, 0])]
         t = trajectory_map[:, 0]
         keep = (t >= gt[0, 0]) & (t <= gt[-1, 0])
-        t, xy = t[keep], trajectory_map[keep, 1:3]
+        t, xy = t[keep], from_map_frame(trajectory_map[keep, 1:3], self.pose_in_map)
         ref = np.c_[np.interp(t, gt[:, 0], gt[:, 1]), np.interp(t, gt[:, 0], gt[:, 2])]
         return t - gt[0, 0], np.hypot(*(xy - ref).T)
 
@@ -152,7 +168,8 @@ def find_ground_truth(session, session_dir):
         map_yaml = resolve_map_yaml(session['track'])
     except (ImportError, FileNotFoundError, LookupError):
         return None
-    return GroundTruth(map_yaml, session_dir / session.get('ground_truth', 'ground_truth.csv'))
+    return GroundTruth(map_yaml, session_dir / session.get('ground_truth', 'ground_truth.csv'),
+                       session.get('ground_truth_pose_in_map', (0.0, 0.0, 0.0)))
 
 
 # Centerline from one map ----------------------------------------------------------------------

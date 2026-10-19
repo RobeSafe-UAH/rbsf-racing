@@ -77,13 +77,13 @@ ros2 launch stack_launcher autonomous_exploration.launch.py \
 - The launch log confirms the controller (`Centring between the walls (fallback 0.4 m to a lone
   wall), 0.8 m/s`) and shows `track=none`: on the car there is no track by default, so nothing from the simulator tracks
   steers the run.
-- The mapper is DualSLAM: SLAM Toolbox owns `/map` and the `map -> r0/odom` transform, and
-  Cartographer maps in parallel on `/r0/mapping/cartographer/map`. On the car Cartographer is
-  LiDAR-only *(untested on the car)*.
+- The mapper is DualSLAM: Cartographer owns `/map` and the `map -> r0/odom` transform, and
+  SLAM Toolbox maps in parallel on `/r0/mapping/slam_toolbox/map`. On the car Cartographer is
+  LiDAR-only.
 - **Watch it** (optional): on the laptop run `ros2 run foxglove_bridge foxglove_bridge` and open
   https://app.foxglove.dev/?ds=foxglove-websocket&ds.url=ws://localhost:8765 (or `rviz2`). Show
-  `/map`, `/r0/mapping/cartographer/map` and `/r0/scan` in the `map` frame. The two maps should
-  overlay; Cartographer's alignment is fitted as the lap progresses.
+  `/map`, `/r0/mapping/slam_toolbox/map` and `/r0/scan` in the `map` frame. The two maps should
+  overlay; SLAM Toolbox's alignment is fitted as the lap progresses.
 
 Drive the lap:
 

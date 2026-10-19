@@ -1,24 +1,28 @@
 """
-Align a secondary Cartographer map with the primary map, so the two overlay.
+Align a secondary SLAM's map with the primary map, so the two overlay.
 
-Cartographer anchors its map frame at the car's start pose, while SLAM Toolbox anchors at the
-odometry origin. This node pairs the car's position in both maps at the same instants (every
-`spacing` m of travel) and publishes the static map -> <secondary map frame> that best fits all
-pairs (least squares, alignment.py), refreshed every `refit_every` new pairs. Residual drift
-between the two SLAMs stays visible as local misalignment (logged as the fit's RMS). It does not
-touch map -> <robot>/odom.
+The SLAMs anchor their map frames differently: Cartographer at the car's start pose, SLAM
+Toolbox at the odometry origin (in sim, the world origin). This node pairs the car's position in
+both maps at the same instants (every `spacing` m of travel) and publishes the static
+map -> <secondary map frame> that best fits all pairs (least squares, alignment.py), refreshed
+every `refit_every` new pairs. Residual drift between the two SLAMs stays visible as local
+misalignment (logged as the fit's RMS). It does not touch map -> <robot>/odom.
 
-Subscribes  tracked_pose  geometry_msgs/PoseStamped (Cartographer, frame = secondary map frame)
+Subscribes  slam_pose     the secondary's pose of the car, in its map frame:
+                          geometry_msgs/PoseStamped (Cartographer's tracked_pose) or, with
+                          with_covariance, geometry_msgs/PoseWithCovarianceStamped (SLAM
+                          Toolbox's pose)
             /tf           map -> <base_frame> (from the primary SLAM and the platform odometry)
 Publishes   /tf_static    map -> <secondary map frame>
 
-Parameters: base_frame (<robot>/base_link), spacing (0.5 m), refit_every (10).
+Parameters: base_frame (<robot>/base_link), with_covariance (false), spacing (0.5 m),
+refit_every (10).
 """
 
 from collections import deque
 import math
 
-from geometry_msgs.msg import PoseStamped, TransformStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, TransformStamped
 from rbsf_dual_slam.alignment import fit_rigid_2d, residual_rms
 import rclpy
 from rclpy.duration import Duration
@@ -43,7 +47,12 @@ class MapOverlay(Node):
         self.pending = deque(maxlen=200)  # tracked poses TF does not cover yet
         self.source, self.target = [], []  # secondary-map and map positions
         self.since_fit = 0
-        self.create_subscription(PoseStamped, 'tracked_pose', self.callback, 10)
+        if self.declare_parameter('with_covariance', False).value:
+            self.create_subscription(
+                PoseWithCovarianceStamped, 'slam_pose',
+                lambda msg: self.callback(PoseStamped(header=msg.header, pose=msg.pose.pose)), 10)
+        else:
+            self.create_subscription(PoseStamped, 'slam_pose', self.callback, 10)
 
     def callback(self, msg):
         # Cartographer extrapolates tracked_pose slightly ahead of TF: pair the newest pose

@@ -3,9 +3,9 @@ Frame and topic names of a SLAM implementation in the mapping slot (no ROS impor
 
 Exactly one component owns /map and map -> <robot>/odom (docs/DESIGN_PHILOSOPHY.md §3.2). In
 DualSLAM that is the *primary* SLAM. The secondary one publishes no TF, and its map goes on
-/<robot>/mapping/<impl>/map in its own frame <robot>/<impl>/map, which a static TF hangs
-below `map` (identity for SLAM Toolbox, which anchors at the odometry origin; measured once by
-map_overlay for Cartographer, which anchors at the start pose), so the two maps overlay.
+/<robot>/mapping/<impl>/map in its own frame <robot>/<impl>/map, which map_overlay hangs below
+`map` (fitted to the secondary's poses of the car: the SLAMs anchor their maps differently), so
+the two maps overlay.
 """
 
 from dataclasses import dataclass

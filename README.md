@@ -92,9 +92,9 @@ ros2 launch stack_launcher autonomous_exploration.launch.py platform:=f1tenth tr
 ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger
 ```
 
-- SLAM Toolbox is the primary mapper: it publishes `/map` and owns `map -> r0/odom`.
-  Cartographer runs without TF on `/r0/mapping/cartographer/map`, in the frame
-  `r0/cartographer/map`. `map_overlay` fits that frame to `map` from both trajectories, so the
+- Cartographer is the primary mapper: it publishes `/map` and owns `map -> r0/odom`.
+  SLAM Toolbox runs without TF on `/r0/mapping/slam_toolbox/map`, in the frame
+  `r0/slam_toolbox/map`. `map_overlay` fits that frame to `map` from both trajectories, so the
   two maps overlay in Foxglove.
 - A save writes `maps/<YYYYMMDD_HHMMSS>/{slam_toolbox,cartographer}/map.{pgm,yaml}` (nav2
   map_server format, the input of the offline map cleaning and centerline tools), each SLAM's

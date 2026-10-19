@@ -5,7 +5,7 @@ Runs in the car's namespace (/r0, ...). On a trigger it writes, for each configu
 
     <output_dir>/<YYYYMMDD_HHMMSS>/<name>/map.pgm, map.yaml   (nav2 map_server format)
     <output_dir>/<YYYYMMDD_HHMMSS>/<name>/trajectory.csv      (the car as that SLAM saw it)
-    <output_dir>/<YYYYMMDD_HHMMSS>/ground_truth.csv           (simulators only)
+    <output_dir>/<YYYYMMDD_HHMMSS>/ground_truth.csv           (simulators only, world frame)
     <output_dir>/<YYYYMMDD_HHMMSS>/session.yaml               (platform, track, primary, maps)
 
 and asks the SLAM that built the map to save its own state next to it, so the session can be
@@ -15,15 +15,21 @@ result. A failure there never blocks the PGM/YAML save.
 
 session.yaml gives each map's frame and its pose in `map` (pose_in_map: x, y, yaw from TF), so
 the offline tools can bring the maps into one frame. Each trajectory is in its own map's frame
-and comes from that SLAM alone (Cartographer: tracked_pose; others: TF <frame> -> base_frame),
-so it is consistent with its map even when the two SLAMs disagree. The offline tools take the
-driving direction and the start/finish line from it, and check that it stays inside the map's
-free space. Poses are kept every `trajectory_spacing` m of travel.
+and comes from that SLAM alone (Cartographer: tracked_pose; SLAM Toolbox: pose; others: TF
+<frame> -> base_frame), so it is consistent with its map even when the two SLAMs disagree.
+The offline tools take the driving direction and the start/finish line from it, and check that
+it stays inside the map's free space. Poses are kept every `trajectory_spacing` m of travel.
+
+On the simulators the ground truth stays in the simulator's world frame, which only matches
+`map` when the primary SLAM anchors at the odometry origin (Cartographer anchors at the start
+pose): ground_truth_pose_in_map is the world frame's pose in `map`, a least-squares fit of the
+car's ground-truth and `map` positions (pairs every 0.5 m), with its RMS.
 
 Subscribes  <map topics>              nav_msgs/OccupancyGrid (transient local; `maps` parameter)
             joy                       sensor_msgs/Joy (rising edge of `save_button`)
             /tf, /tf_static           map -> <map frames>, <map frames> -> base_frame
             tracked_pose              geometry_msgs/PoseStamped (Cartographer's own pose)
+            pose                      geometry_msgs/PoseWithCovarianceStamped (SLAM Toolbox's)
             ground_truth/odom         nav_msgs/Odometry (simulators only)
 Services    mapping/save_maps         std_srvs/Trigger (message: the session directory)
 Clients     slam_toolbox/serialize_map  slam_toolbox/SerializePoseGraph (map named slam_toolbox)
@@ -33,12 +39,14 @@ Parameters: output_dir, maps (list of "name:topic"), save_button (-1 disables it
 track, primary, base_frame (<robot>/base_link), trajectory_spacing (0.05 m).
 """
 
+from collections import deque
 import datetime
 import math
 import pathlib
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from nav_msgs.msg import OccupancyGrid, Odometry
+from rbsf_dual_slam.alignment import fit_rigid_2d, residual_rms
 from rbsf_dual_slam.occupancy import save_map, yaw_from_quaternion
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -52,6 +60,9 @@ import yaml
 
 LATCHED = QoSProfile(
     depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
+# Ground truth <-> map pairs: one every PAIR_SPACING m, matched within PAIR_DT s; fit from
+# MIN_PAIRS on.
+PAIR_SPACING, PAIR_DT, MIN_PAIRS = 0.5, 0.05, 5
 
 
 class Trajectory:
@@ -87,6 +98,36 @@ def parse_maps(entries):
     return maps
 
 
+class GroundTruthAlignment:
+    """Pairs of the car's ground-truth and `map` positions, and the world frame's pose in map."""
+
+    def __init__(self):
+        self.recent = deque(maxlen=500)  # (t, x, y) ground truth, to match TF stamps
+        self.world, self.map = [], []
+
+    def add_ground_truth(self, t, x, y):
+        self.recent.append((t, x, y))
+
+    def add_map(self, t, x, y):
+        """Pair a `map` position with the ground truth nearest in time (within PAIR_DT)."""
+        if not self.recent:
+            return
+        nearest = min(self.recent, key=lambda pose: abs(pose[0] - t))
+        if abs(nearest[0] - t) > PAIR_DT:
+            return
+        if self.map and math.dist(self.map[-1], (x, y)) < PAIR_SPACING:
+            return
+        self.world.append(nearest[1:])
+        self.map.append((x, y))
+
+    def fit(self):
+        """[x, y, yaw] of the world frame in map and the fit's RMS (m), or None."""
+        if len(self.world) < MIN_PAIRS:
+            return None
+        pose = fit_rigid_2d(self.world, self.map)
+        return list(pose), residual_rms(self.world, self.map, pose)
+
+
 class MapSaver(Node):
 
     def __init__(self):
@@ -106,8 +147,12 @@ class MapSaver(Node):
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.trajectories = {name: Trajectory(spacing) for name in self.maps}
         self.ground_truth = Trajectory(spacing)
+        self.alignment = GroundTruthAlignment()
         if 'cartographer' in self.maps:
             self.create_subscription(PoseStamped, 'tracked_pose', self.tracked_pose_callback, 10)
+        if 'slam_toolbox' in self.maps:
+            self.create_subscription(
+                PoseWithCovarianceStamped, 'pose', self.slam_toolbox_pose_callback, 10)
         self.create_subscription(Odometry, 'ground_truth/odom', self.ground_truth_callback, 10)
         self.create_timer(0.1, self.record_tf_poses)
         self.last_button = 0
@@ -130,14 +175,27 @@ class MapSaver(Node):
             stamp(msg.header), msg.pose.position.x, msg.pose.position.y,
             yaw_from_quaternion(q.x, q.y, q.z, q.w))
 
+    def slam_toolbox_pose_callback(self, msg):
+        p, q = msg.pose.pose.position, msg.pose.pose.orientation
+        self.trajectories['slam_toolbox'].add(
+            stamp(msg.header), p.x, p.y, yaw_from_quaternion(q.x, q.y, q.z, q.w))
+
     def ground_truth_callback(self, msg):
         p, q = msg.pose.pose.position, msg.pose.pose.orientation
         self.ground_truth.add(stamp(msg.header), p.x, p.y, yaw_from_quaternion(q.x, q.y, q.z, q.w))
+        self.alignment.add_ground_truth(stamp(msg.header), p.x, p.y)
 
     def record_tf_poses(self):
-        """Pose of base_frame in each (non-Cartographer) map's frame, from TF."""
+        """Pose of base_frame in `map` (ground-truth pairs) and in maps without a pose topic."""
+        if self.alignment.recent:
+            try:
+                tf = self.tf_buffer.lookup_transform('map', self.base_frame, Time())
+                t = tf.transform.translation
+                self.alignment.add_map(stamp(tf.header), t.x, t.y)
+            except TransformException:
+                pass
         for name, grid in self.grids.items():
-            if name == 'cartographer':
+            if name in ('cartographer', 'slam_toolbox'):
                 continue
             try:
                 tf = self.tf_buffer.lookup_transform(grid.header.frame_id, self.base_frame, Time())
@@ -196,8 +254,14 @@ class MapSaver(Node):
             session['maps'][name]['trajectory'] = f'{name}/trajectory.csv'
             self.save_native(name, directory / name)
         if self.ground_truth.poses:
-            self.ground_truth.save(directory / 'ground_truth.csv', 'map')
+            self.ground_truth.save(directory / 'ground_truth.csv', 'world')
             session['ground_truth'] = 'ground_truth.csv'
+            fit = self.alignment.fit()
+            if fit is None:
+                self.get_logger().warn('Too few ground-truth/map pairs: ground truth not aligned')
+            else:
+                session['ground_truth_pose_in_map'], rms = fit
+                session['ground_truth_fit_rms_m'] = round(rms, 3)
         if missing:
             session['missing'] = missing
             self.get_logger().warn(f"No map yet from {', '.join(missing)}: not saved")

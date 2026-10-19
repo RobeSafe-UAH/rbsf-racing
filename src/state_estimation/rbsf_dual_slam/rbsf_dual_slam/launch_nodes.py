@@ -20,31 +20,33 @@ def overlay_tf(robot, implementation, names):
     """
     Hang a secondary map frame below map, so the two maps overlay.
 
-    SLAM Toolbox anchors its map at the odometry origin: identity. Cartographer anchors it at
-    the car's start pose: map_overlay measures it from the first tracked_pose.
+    The SLAMs anchor their maps at different poses (Cartographer at the car's start pose, SLAM
+    Toolbox at the odometry origin), so map_overlay fits the offset from the secondary's poses
+    of the car.
     """
-    if implementation == 'cartographer':
-        return Node(
-            package='rbsf_dual_slam', executable='map_overlay', namespace=robot,
-            parameters=[{'base_frame': names.base_frame}])
+    pose_topic, with_covariance = {
+        'cartographer': ('tracked_pose', False),
+        'slam_toolbox': ('pose', True),
+    }[implementation]
     return Node(
-        package='tf2_ros', executable='static_transform_publisher',
-        name=f'{implementation}_map_overlay', namespace=robot,
-        arguments=['--frame-id', 'map', '--child-frame-id', names.map_frame])
+        package='rbsf_dual_slam', executable='map_overlay', name=f'{implementation}_map_overlay',
+        namespace=robot, remappings=[('slam_pose', pose_topic)],
+        parameters=[{'base_frame': names.base_frame, 'with_covariance': with_covariance}])
 
 
 def slam_toolbox(robot, platform, names, use_sim_time):
     """async_slam_toolbox_node (a lifecycle node, configured and activated at startup)."""
     config = os.path.join(SHARE, 'config', f'slam_toolbox_{config_variant(platform)}.yaml')
+    # SLAM Toolbox publishes on its map_name parameter (default /map, plus '_metadata'), not on
+    # a remappable topic.
     overrides = {'use_sim_time': use_sim_time, 'map_frame': names.map_frame,
                  'odom_frame': names.odom_frame, 'base_frame': names.base_frame,
-                 'use_lifecycle_manager': False}
+                 'map_name': names.map_topic, 'use_lifecycle_manager': False}
     if not names.publish_tf:
         overrides['transform_publish_period'] = 0.0
     node = LifecycleNode(
         package='slam_toolbox', executable='async_slam_toolbox_node', name='slam_toolbox',
-        namespace=robot, parameters=[config, overrides], output='screen',
-        remappings=[('map', names.map_topic), ('map_metadata', f'{names.map_topic}_metadata')])
+        namespace=robot, parameters=[config, overrides], output='screen')
     configure = EmitEvent(event=ChangeState(
         lifecycle_node_matcher=matches_action(node),
         transition_id=Transition.TRANSITION_CONFIGURE))

@@ -1,16 +1,17 @@
 """
-Mapping slot: DualSLAM. SLAM Toolbox and Cartographer map side by side from the same scans.
+Mapping slot: DualSLAM. Cartographer and SLAM Toolbox map side by side from the same scans.
 
 Follows the component launch contract (docs/DESIGN_PHILOSOPHY.md §4.2), plus output_dir.
-SLAM Toolbox is the primary: it alone owns /map and map -> <robot>/odom. Cartographer runs
-without TF on /<robot>/mapping/cartographer/map, in the frame <robot>/cartographer/map, which
-map_overlay hangs below map once, from Cartographer's first tracked_pose, so the maps overlay. One
-map_saver saves both (joystick button Y, or `ros2 service call /<robot>/mapping/save_maps
-std_srvs/srv/Trigger`) into <output_dir>/<YYYYMMDD_HHMMSS>/{slam_toolbox,cartographer}/.
+Cartographer is the primary: it alone owns /map and map -> <robot>/odom (it builds the better
+maps in sim and on the car). SLAM Toolbox runs without TF on /<robot>/mapping/slam_toolbox/map,
+in the frame <robot>/slam_toolbox/map, which map_overlay hangs below map, fitted to SLAM
+Toolbox's poses of the car, so the maps overlay. One map_saver saves both (joystick button Y, or
+`ros2 service call /<robot>/mapping/save_maps std_srvs/srv/Trigger`) into
+<output_dir>/<YYYYMMDD_HHMMSS>/{cartographer,slam_toolbox}/.
 
     Subscribes  /<robot>/scan, /tf (<robot>/odom -> <robot>/base_link from the platform)
-    Publishes   /map, TF map -> <robot>/odom (slam_toolbox)
-                /<robot>/mapping/cartographer/map, /tf_static map -> <robot>/cartographer/map
+    Publishes   /map, TF map -> <robot>/odom (cartographer)
+                /<robot>/mapping/slam_toolbox/map, /tf_static map -> <robot>/slam_toolbox/map
     Services    /<robot>/mapping/save_maps
 """
 
@@ -21,7 +22,7 @@ from rbsf_dual_slam import launch_nodes
 from rbsf_dual_slam.contract import check_platform, slam_arguments
 from rbsf_dual_slam.frames import slam_names
 
-PRIMARY, SECONDARY = 'slam_toolbox', 'cartographer'
+PRIMARY, SECONDARY = 'cartographer', 'slam_toolbox'
 
 
 def launch_setup(context):
@@ -33,8 +34,8 @@ def launch_setup(context):
     primary = slam_names(robot, PRIMARY, primary=True)
     secondary = slam_names(robot, SECONDARY, primary=False)
     return [
-        *launch_nodes.slam_toolbox(robot, platform, primary, use_sim_time),
-        *launch_nodes.cartographer(robot, platform, secondary, use_sim_time),
+        *getattr(launch_nodes, PRIMARY)(robot, platform, primary, use_sim_time),
+        *getattr(launch_nodes, SECONDARY)(robot, platform, secondary, use_sim_time),
         launch_nodes.overlay_tf(robot, SECONDARY, secondary),
         launch_nodes.map_saver(
             robot, platform, arg('track'),
