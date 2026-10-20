@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live plot</title>
+<style>
+/* Served by rbsf_telemetry's web_plot node; no external resources, so it works offline. */
+:root {
+  --bg: #f3f5f7; --panel: #ffffff; --ink: #17212b; --muted: #5d6975; --grid: #e3e8ed;
+  --axis: #c3ccd5; --live: #1f8a5b; --stale: #b7791f; --error: #c53030;
+  --s1: #2563c9; --s2: #d9480f; --s3: #148a5c; --s4: #8b46c4; --s5: #a16207; --s6: #c2255c;
+  --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1418; --panel: #171e24; --ink: #e2e8ee; --muted: #93a0ac; --grid: #232c34;
+    --axis: #36414b; --live: #48c78e; --stale: #e0a43a; --error: #f07171;
+    --s1: #6ea8ff; --s2: #ff8a4c; --s3: #4cd19a; --s4: #c08cff; --s5: #e6b84a; --s6: #ff7aa8;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 14px/1.4 var(--sans); display: flex;
+  flex-direction: column; padding: 12px 16px 16px; gap: 10px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; }
+h1 { font-size: 18px; font-weight: 600; margin: 0; }
+h1 small { font-weight: 400; color: var(--muted); font-size: 14px; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-left: auto; }
+.seg { display: inline-flex; border: 1px solid var(--axis); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; border-left: 1px solid var(--axis); }
+.seg button:first-child { border-left: 0; }
+button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--axis);
+  border-radius: 4px; padding: 4px 10px; cursor: pointer; }
+.seg button { border-radius: 0; }
+button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+button:focus-visible { outline: 2px solid var(--s1); outline-offset: 1px; }
+label.check { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.conn { font-family: var(--mono); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.conn.ok .dot { background: var(--live); }
+.conn.bad .dot { background: var(--error); }
+main { flex: 1; min-height: 260px; background: var(--panel); border: 1px solid var(--axis);
+  border-radius: 6px; position: relative; }
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--axis);
+  border-radius: 4px; padding: 6px 8px; font-family: var(--mono); font-size: 12px; white-space: nowrap;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.12); }
+.tip div { display: flex; gap: 8px; align-items: center; }
+.tip b { font-weight: 500; margin-left: auto; padding-left: 12px; }
+.legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.item { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 2px 10px; align-items: center;
+  text-align: left; padding: 8px 10px; background: var(--panel); }
+.item[aria-pressed="false"] { opacity: 0.45; }
+.item[aria-pressed] { color: var(--ink); background: var(--panel); }
+.sw { width: 14px; height: 3px; border-radius: 2px; }
+.name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; }
+.path { grid-column: 2 / 4; font-family: var(--mono); font-size: 11px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { grid-column: 2 / 4; font-size: 12px; color: var(--muted); }
+.status.live { color: var(--live); }
+.status.stale { color: var(--stale); }
+.status.error { color: var(--error); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Live plot <small id="unit"></small></h1>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Time window" id="windows">
+      <button type="button" data-w="10">10 s</button>
+      <button type="button" data-w="30" aria-pressed="true">30 s</button>
+      <button type="button" data-w="60">60 s</button>
+      <button type="button" data-w="120">120 s</button>
+    </div>
+    <label class="check"><input type="checkbox" id="zero" checked> Include zero</label>
+    <button type="button" id="pause" aria-pressed="false">Pause</button>
+    <span class="conn" id="conn"><i class="dot"></i><span>connecting</span></span>
+  </div>
+</header>
+<main id="area">
+  <canvas id="plot"></canvas>
+  <div class="tip" id="tip" hidden></div>
+</main>
+<div class="legend" id="legend"></div>
+
+<script>
+(() => {
+  const STALE_AFTER = 1.0;  // seconds without data before a series counts as stale
+  const COLORS = ['--s1', '--s2', '--s3', '--s4', '--s5', '--s6'];
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('plot'), ctx = canvas.getContext('2d'), tip = $('tip');
+
+  let meta = null, data = [], hidden = new Set();
+  let serverNow = 0, receivedAt = 0, frozenNow = null;
+  let windowSeconds = 30, includeZero = true, hoverX = null;
+
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const color = (i) => css(COLORS[i % COLORS.length]);
+  const fmt = (v) => (v === undefined ? '–' : Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(3));
+
+  // ---- Data ----
+  function onBatch(batch) {
+    if (batch.meta) {
+      const fresh = !meta || meta.series.length !== batch.meta.series.length;
+      meta = batch.meta;
+      if (fresh) data = meta.series.map(() => ({ t: [], v: [] }));
+      $('title').firstChild.textContent = meta.title + ' ';
+      $('unit').textContent = meta.unit ? '(' + meta.unit + ')' : '';
+      document.title = meta.title;
+      buildLegend();
+    }
+    for (const [i, points] of Object.entries(batch.points)) {
+      const d = data[i];
+      if (!d) continue;
+      for (const [t, v] of points) { d.t.push(t); d.v.push(v); }
+    }
+    serverNow = batch.now;
+    receivedAt = performance.now();
+    const oldest = serverNow - (meta ? meta.history : 120);
+    for (const d of data) {
+      const k = lowerBound(d.t, oldest);
+      if (k > 0) { d.t.splice(0, k); d.v.splice(0, k); }
+    }
+  }
+
+  function lowerBound(arr, x) {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m] < x) lo = m + 1; else hi = m; }
+    return lo;
+  }
+
+  function connect() {
+    const conn = $('conn');
+    const es = new EventSource('events');
+    es.onopen = () => {
+      // The server resends its whole buffer on every connection: start over.
+      meta = null; data = [];
+      conn.className = 'conn ok'; conn.lastChild.textContent = 'live';
+    };
+    es.onerror = () => { conn.className = 'conn bad'; conn.lastChild.textContent = 'reconnecting'; };
+    es.onmessage = (e) => onBatch(JSON.parse(e.data));
+  }
+
+  // ---- Legend ----
+  function buildLegend() {
+    const legend = $('legend');
+    legend.replaceChildren();
+    meta.series.forEach((s, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'item'; b.id = 'series-' + i;
+      b.setAttribute('aria-pressed', String(!hidden.has(i)));
+      b.title = s.topic ? s.topic + ' — click to hide or show' : s.path;
+      b.innerHTML = '<i class="sw"></i><span class="name"></span><span class="val">–</span>' +
+        '<span class="path"></span><span class="status"></span>';
+      b.querySelector('.sw').style.background = color(i);
+      b.querySelector('.name').textContent = s.label;
+      b.querySelector('.path').textContent = s.path;
+      b.addEventListener('click', () => {
+        hidden.has(i) ? hidden.delete(i) : hidden.add(i);
+        b.setAttribute('aria-pressed', String(!hidden.has(i)));
+      });
+      legend.appendChild(b);
+    });
+  }
+
+  function updateLegend(now) {
+    if (!meta) return;
+    meta.series.forEach((s, i) => {
+      const el = $('series-' + i);
+      if (!el) return;
+      const d = data[i], n = d ? d.t.length : 0;
+      const last = n ? d.t[n - 1] : null;
+      // Server statuses: 'waiting for topic', 'no data yet', 'live', or an error message.
+      let text = s.status, cls = '';
+      if (!['waiting for topic', 'no data yet', 'live'].includes(s.status)) {
+        cls = 'error';
+      } else if (last !== null) {
+        const age = serverNow - last;
+        if (age > STALE_AFTER) { text = `stale: no data for ${age.toFixed(1)} s`; cls = 'stale'; }
+        else { text = 'live'; cls = 'live'; }
+      }
+      const st = el.querySelector('.status');
+      st.textContent = text; st.className = 'status ' + cls;
+      el.querySelector('.val').textContent = n ? fmt(d.v[n - 1]) : '–';
+    });
+  }
+
+  // ---- Plot ----
+  function niceStep(span, target) {
+    const raw = span / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const r = raw / mag;
+    return (r < 1.5 ? 1 : r < 3 ? 2 : r < 7 ? 5 : 10) * mag;
+  }
+
+  function draw() {
+    requestAnimationFrame(draw);
+    const W = canvas.clientWidth, H = canvas.clientHeight, dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
+      canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const now = frozenNow !== null ? frozenNow
+      : serverNow + Math.min(0.3, (performance.now() - receivedAt) / 1000);
+    const t0 = now - windowSeconds;
+    const L = 58, R = 14, T = 12, B = 28, pw = W - L - R, ph = H - T - B;
+    if (pw <= 0 || ph <= 0) return;
+
+    // Y range over the visible points.
+    let lo = Infinity, hi = -Infinity;
+    data.forEach((d, i) => {
+      if (hidden.has(i)) return;
+      for (let k = Math.max(0, lowerBound(d.t, t0) - 1); k < d.t.length; k++) {
+        if (d.v[k] < lo) lo = d.v[k];
+        if (d.v[k] > hi) hi = d.v[k];
+      }
+    });
+    if (lo === Infinity) { lo = 0; hi = 1; }
+    if (includeZero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
+    if (hi - lo < 1e-9) { lo -= 0.5; hi += 0.5; }
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+
+    const X = (t) => L + (t - t0) / windowSeconds * pw;
+    const Y = (v) => T + (hi - v) / (hi - lo) * ph;
+
+    // Grid and labels.
+    const grid = css('--grid'), axis = css('--axis'), muted = css('--muted');
+    ctx.font = '11px ' + css('--mono');
+    ctx.lineWidth = 1;
+    const ys = niceStep(hi - lo, Math.max(2, Math.floor(ph / 45)));
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    // Integer steps, so ticks do not accumulate rounding errors (0 stays 0).
+    const decimals = Math.max(0, -Math.floor(Math.log10(ys)));
+    for (let k = Math.ceil(lo / ys); k * ys <= hi; k++) {
+      const y = Math.round(Y(k * ys)) + 0.5;
+      ctx.strokeStyle = k === 0 ? axis : grid;
+      ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke();
+      ctx.fillStyle = muted; ctx.fillText((k * ys).toFixed(decimals), L - 8, y);
+    }
+    const xs = niceStep(windowSeconds, Math.max(2, Math.floor(pw / 90)));
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let a = 0; a <= windowSeconds + 1e-9; a += xs) {
+      const x = Math.round(X(now - a)) + 0.5;
+      ctx.strokeStyle = grid;
+      ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke();
+      ctx.fillStyle = muted; ctx.fillText(a === 0 ? 'now' : '−' + +a.toPrecision(6) + ' s', x, T + ph + 8);
+    }
+    ctx.strokeStyle = axis; ctx.strokeRect(L + 0.5, T + 0.5, pw - 1, ph - 1);
+
+    // Series.
+    ctx.save();
+    ctx.beginPath(); ctx.rect(L, T, pw, ph); ctx.clip();
+    ctx.lineWidth = 1.75; ctx.lineJoin = 'round';
+    data.forEach((d, i) => {
+      if (hidden.has(i) || !d.t.length) return;
+      ctx.strokeStyle = color(i);
+      ctx.beginPath();
+      const k0 = Math.max(0, lowerBound(d.t, t0) - 1);
+      for (let k = k0; k < d.t.length; k++) {
+        // Break the line over gaps longer than STALE_AFTER instead of joining across them.
+        const x = X(d.t[k]), y = Y(d.v[k]);
+        if (k === k0 || d.t[k] - d.t[k - 1] > STALE_AFTER) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
+    ctx.restore();
+
+    // Hover readout.
+    if (hoverX !== null && hoverX >= L && hoverX <= L + pw && meta) {
+      const t = t0 + (hoverX - L) / pw * windowSeconds;
+      ctx.strokeStyle = muted; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(Math.round(hoverX) + 0.5, T); ctx.lineTo(Math.round(hoverX) + 0.5, T + ph); ctx.stroke();
+      ctx.setLineDash([]);
+      const rows = [`<div>−${(now - t).toFixed(2)} s</div>`];
+      data.forEach((d, i) => {
+        if (hidden.has(i) || !d.t.length) return;
+        let k = lowerBound(d.t, t);
+        if (k > 0 && (k === d.t.length || t - d.t[k - 1] < d.t[k] - t)) k -= 1;
+        if (Math.abs(d.t[k] - t) > STALE_AFTER) return;
+        ctx.fillStyle = color(i);
+        ctx.beginPath(); ctx.arc(X(d.t[k]), Y(d.v[k]), 3.5, 0, 2 * Math.PI); ctx.fill();
+        rows.push(`<div><i class="sw" style="background:${color(i)}"></i>${escapeHtml(meta.series[i].label)}<b>${fmt(d.v[k])}</b></div>`);
+      });
+      tip.innerHTML = rows.join('');
+      tip.hidden = false;
+      const left = hoverX + 14 + tip.offsetWidth > W ? hoverX - 14 - tip.offsetWidth : hoverX + 14;
+      tip.style.left = left + 'px'; tip.style.top = (T + 8) + 'px';
+    } else {
+      tip.hidden = true;
+    }
+    updateLegend(now);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  }
+
+  // ---- Controls ----
+  document.querySelectorAll('#windows button').forEach((b) => b.addEventListener('click', () => {
+    windowSeconds = +b.dataset.w;
+    document.querySelectorAll('#windows button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+  }));
+  $('zero').addEventListener('change', (e) => { includeZero = e.target.checked; });
+  $('pause').addEventListener('click', (e) => {
+    frozenNow = frozenNow === null ? serverNow : null;
+    e.target.textContent = frozenNow === null ? 'Pause' : 'Resume';
+    e.target.setAttribute('aria-pressed', String(frozenNow !== null));
+  });
+  const area = $('area');
+  area.addEventListener('mousemove', (e) => { hoverX = e.clientX - area.getBoundingClientRect().left; });
+  area.addEventListener('mouseleave', () => { hoverX = null; });
+
+  connect();
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

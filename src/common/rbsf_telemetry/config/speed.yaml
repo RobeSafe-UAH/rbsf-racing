@@ -1,0 +1,20 @@
+# web_plot: speed of one car, in m/s. Paths are relative to the car namespace (/r0, ...).
+/**:
+  ros__parameters:
+    title: Speed
+    unit: m/s
+    series:
+      # What the controller asks for.
+      - "controller=drive_gate/auto_cmd/drive/speed"
+      # What drive_gate lets through (0 while stopped or disarmed).
+      - "sent=drive/drive/speed"
+      # VESC measurement: ERPM / speed_to_erpm_gain, from vesc_to_odom (real car only).
+      - "VESC measured=vesc/odom/twist/twist/linear/x"
+      # Odometry: RF2O on the real car, ground truth in sim.
+      - "odometry=odom/twist/twist/linear/x"
+    # Bind to all interfaces (0.0.0.0) to open the page from another machine.
+    host: 127.0.0.1
+    port: 8090
+    # Seconds kept, and batches sent to each browser per second.
+    history: 120.0
+    push_rate: 20.0
