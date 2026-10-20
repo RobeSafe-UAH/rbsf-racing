@@ -72,12 +72,63 @@ platform (`real`, `mvsim`, `f1tenth`) and deployment (`local`, `distributed`). S
 
 Every command to the motors goes through `drive_gate` (`rbsf_safety`), the only publisher on
 `/<ns>/drive`. It fails closed: any lost signal stops the car, and a second publisher on `drive`
-shuts the whole stack down. Its state is on `/<ns>/drive_gate/state`.
+shuts the whole stack down. Its state is on `/<ns>/drive_gate/state` (JSON `{state, reason,
+armed}`): `MANUAL`, `AUTONOMOUS` or `STOPPED` (speed 0, steering 0) with the reason below.
+
+```mermaid
+stateDiagram-v2
+    state "STOPPED / NO_JOY" as NO_JOY
+    state "STOPPED / JOY_TIMEOUT" as JOY_TIMEOUT
+    state "Joystick alive" as Alive
+    state "STOPPED / DISARMED" as DISARMED
+    state "STOPPED / DEADMAN_RELEASED" as RELEASED
+    state "STOPPED / AUTO_CMD_TIMEOUT" as STALE
+    [*] --> NO_JOY: start
+    NO_JOY --> Alive: first joy message
+    state Alive {
+        state "LB released" as Auto
+        [*] --> Auto
+        Auto --> MANUAL: LB held
+        MANUAL --> Auto: LB released (back to the same arming state)
+        state Auto {
+            [*] --> DISARMED
+            DISARMED --> Armed: START press, RB released
+            state Armed {
+                [*] --> RELEASED
+                RELEASED --> AUTONOMOUS: RB held, fresh auto_cmd
+                RELEASED --> STALE: RB held, no fresh auto_cmd
+                AUTONOMOUS --> RELEASED: RB released
+                AUTONOMOUS --> STALE: auto_cmd older than 0.2 s
+                STALE --> AUTONOMOUS: fresh auto_cmd
+                STALE --> RELEASED: RB released
+            }
+            Armed --> DISARMED: BACK press
+        }
+    }
+    Alive --> JOY_TIMEOUT: no joy for 0.5 s (disarms)
+    JOY_TIMEOUT --> Alive: joy message
+```
+
+- **Start**: the gate starts `STOPPED / NO_JOY` and stays there until a joystick is seen. A
+  joystick never seen keeps the car stopped.
+- **Arming** is a flag, set by a START press (rising edge) only while RB is released, so the car
+  never moves the instant it is armed. BACK clears it, and so does a joystick timeout: after a
+  reconnect the gate is `DISARMED` again. A button already held when the joystick (re)appears
+  does not count as a press.
+- **MANUAL** pre-empts every other state while the joystick is alive and LB is held: the sticks
+  drive. The arming flag is kept underneath (START and BACK still work while in MANUAL), so
+  releasing LB lands in `DISARMED` or `Armed`, whichever the flag says.
+- **`require_deadman:=false`** (simulators only, refused on `platform:=real`) drops the joystick
+  conditions: the gate is `AUTONOMOUS` while `auto_cmd` is fresh, else
+  `STOPPED / AUTO_CMD_TIMEOUT`, and LB still pre-empts it.
+- Timeouts use the receive time on a monotonic clock, so a stalled simulator or a skewed remote
+  clock cannot keep a stale command alive. Buttons and timeouts are in
+  `src/base_system/rbsf_safety/config/drive_gate_{sim,real}.yaml`.
 
 ### Autonomous exploration
 
-The car centres itself between the track boundaries (`rbsf_wall_following`, PI on the nearest
-LiDAR points beside and ahead of the car, with gap and corner handling) while the mapping slot
+The car follows the inner track boundary, or centres itself between both (`rbsf_wall_following`,
+PI on the nearest LiDAR points beside and ahead of the car, with gap and corner handling) while the mapping slot
 builds the map. Boundaries may be walls or rows of cones with gaps (tested up to 0.4 m in sim).
 The default mapper is DualSLAM (`rbsf_dual_slam`): SLAM Toolbox and Cartographer map side by
 side from the same scans.
@@ -128,11 +179,46 @@ ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/
   source map's frame, so the result is a self-contained track for both simulators and the planners.
 - The algorithm (`rbsf_worlds/centerline.py`) is shared with `scripts/tracks/drawn_track.py`.
 
-- The car keeps the same distance to both walls. A wall farther than `max_wall_distance` (2.0 m
-  on the simulators, 1.0 m on the car) is lost (opening, the inner wall of a corner): the car
-  then holds half the corridor width last measured with both walls (for up to 2 s), or 0.4 m,
-  to the other wall. With both walls lost it holds its heading. Gains and distances are in
-  `src/controller/rbsf_wall_following/config/wall_following_{sim,real}.yaml`.
+- The wall follower (`follow_side: left` by default, the inner boundary of a counter-clockwise
+  lap; `right` for clockwise, `centre` to centre between both walls) picks a mode on every scan.
+  A wall farther than `max_wall_distance` (2.0 m on the simulators, 1.0 m on the car) is lost.
+  Gains and distances are in `src/controller/rbsf_wall_following/config/wall_following_{sim,real}.yaml`.
+
+  ```mermaid
+  stateDiagram-v2
+      direction LR
+      [*] --> Centring
+      state "Follow side" as Follow
+      state "Round wall end" as Round
+      state Centring {
+          state "Both walls" as Both
+          state "One wall" as One
+          state "No wall" as None
+          Both --> One: a wall lost
+          One --> Both: both visible
+          One --> None: other wall lost
+          None --> One: a wall visible
+          None --> Both: both visible
+      }
+      Centring --> Follow: followed side within side_capture_distance
+      Follow --> Centring: side farther than side_capture_distance, or lost for over wall_end_memory, or U-turn does not fit
+      Follow --> Round: side lost (within wall_end_memory) and U-turn fits
+      Round --> Follow: side within side_capture_distance again
+      Round --> Centring: U-turn no longer fits
+  ```
+
+  | Mode | Steering |
+  |---|---|
+  | Follow side | PI to `min(side_distance, half the corridor width)` from the followed side |
+  | Round wall end | Full lock towards the followed side (the hairpin around the end of the inner wall), PIs frozen. The U-turn must fit: the full-lock half circle plus `lookahead` m back, clear by `path_half_width`, so a doorway or short alcove is driven past |
+  | Both walls | PI to the middle; the corridor width is remembered |
+  | One wall | PI to half the width remembered (younger than `width_memory`, 2 s), else `fallback_distance` (0.4 m), from the visible wall |
+  | No wall | Holds its heading, PIs frozen |
+
+  Corners override every mode except *Round wall end*: as the free distance in the car's path
+  drops from `corner_distance` (1.5 m) to `corner_min_distance` (0.7 m), steering blends into full
+  lock, towards the more open side just before the obstacle (with one side followed, towards that
+  side while it leaves `side_distance` of room). With `follow_side: centre` only *Centring* exists.
 - `controller:=follow_the_gap` (`rbsf_follow_the_gap`, as in the ForzaETH mapping launch) drives
   into the largest gap of the scan instead, so it also goes around static obstacles. Every
   LiDAR point is inflated by the car's half-width (`inflation_radius`), which closes the gaps of
@@ -152,7 +238,7 @@ ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/
 # Everything on the car
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real
 # Distributed: same ROS_DOMAIN_ID on both machines (make run ROS_DOMAIN_ID=<n>)
-ros2 launch stack_launcher platform.launch.py platform:=real                                    # car
+ros2 launch stack_launcher platform.launch.py platform:=real require_deadman:=true                  # car
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed  # laptop
 ```
 
