@@ -47,9 +47,11 @@
     # Speed (m/s): max_speed straight, min_speed at full lock, capped to stop stop_distance (m)
     # before the target with max_decel (m/s^2). Never below min_speed while moving; 0 only when
     # no gap fits the car. drive_gate clips it to its max_auto_speed.
-    max_speed: 1.2
+    # 1.6 / 1.2 laps eps_oval_single_wall in the kinematic check with up to 120 ms of extra
+    # steering lag (2026-10-20); not yet run in f1tenth_gym or MVSim, nor on the car.
+    max_speed: 1.6
     # The motor does not turn the wheels below ~0.8 m/s (VESC deadband).
-    min_speed: 0.8
+    min_speed: 1.2
     max_decel: 2.0
     stop_distance: 0.3
     # Publish follow_the_gap/scan (inflated) and follow_the_gap/markers (gap and target).
