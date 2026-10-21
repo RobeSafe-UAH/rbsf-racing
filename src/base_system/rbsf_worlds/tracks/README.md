@@ -19,6 +19,7 @@ closed lap.
 | `levine` | 61.8 m (centerline) | centerline | f1tenth_gym_ros `maps/levine*` |
 | `spielberg` | 343.3 m (centerline), 338.1 m (raceline) | centerline, raceline | f1tenth_gym_ros `maps/Spielberg*` |
 | `iros2026` | 209.4 m (centerline) | centerline | IROS 2026 RoboRacer competition map |
+| `eps_circuit` | 21.1 m (centerline) | centerline | Mapped by the real car (session `20261021_122444`, Cartographer) |
 
 `levine` and `spielberg` come from [f1tenth/f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros) (branch
 `dev-jazzy`, commit `f9ad174`), MIT License, Copyright (c) 2020 Hongrui Zheng. Spielberg files
@@ -31,6 +32,10 @@ generated from it by `scripts/tracks/drawn_track.py` (rerun it if the organisers
     python3 scripts/tracks/drawn_track.py \
         src/base_system/rbsf_worlds/tracks/iros2026/iros2026_original.yaml \
         --name iros2026 --start 32.5 8.3 --ccw
+
+`eps_circuit` is the exception to the rule below: a car-mapped track kept so both simulators
+can drive it by name. It is `session_track.py centerline --source cartographer` output, copied
+from `maps/20261021_122444/track/`; the corridor is 1.0-1.9 m wide, driven counter-clockwise.
 
 Tracks mapped by the car itself are not stored here: `scripts/maps/session_track.py` builds them
 inside the mapping session (`maps/<stamp>/track/`, same file formats) from the SLAM map you pick
