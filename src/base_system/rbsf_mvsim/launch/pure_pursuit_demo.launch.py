@@ -28,7 +28,7 @@ from rbsf_worlds.paths import arc_lengths, load_waypoints, spawn_poses
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
 
 
-def demo_driver(law, namespace, waypoints, overrides):
+def demo_driver(law, namespace, waypoints, overrides, track):
     """
     One car's line follower outside drive_gate: identity planning plus the path tracker.
 
@@ -37,7 +37,7 @@ def demo_driver(law, namespace, waypoints, overrides):
     return [
         Node(package='rbsf_identity', executable='reference_line', namespace=namespace,
              parameters=[{'waypoints_file': waypoints}]),
-        tracker_node(law, namespace, 'mvsim', overrides=overrides,
+        tracker_node(law, namespace, 'mvsim', track, overrides=overrides,
                      remappings=[('localization/odom', 'ground_truth/odom'),
                                  ('drive_gate/auto_cmd', 'drive')]),
     ]
@@ -88,7 +88,7 @@ def launch_setup(context):
     }
     drivers = []
     for name in (names if arg('ego_driver').lower() == 'true' else names[1:]):
-        drivers += demo_driver(arg('controller'), name, waypoints, overrides)
+        drivers += demo_driver(arg('controller'), name, waypoints, overrides, str(map_yaml))
     return [
         LogInfo(msg=f'Pure Pursuit demo (MVSim): {len(names)} cars, {spacing} m apart on '
                     f'{waypoints} ({length:.1f} m)'),

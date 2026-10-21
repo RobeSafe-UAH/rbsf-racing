@@ -261,7 +261,10 @@ parameters and a different `steering_law`. Each aims at the waypoint a lookahead
 The speed is constant (`speed`): `nav_msgs/Path` has no speed profile (that comes with
 `rbsf_msgs/Trajectory`). Parameters are in
 `src/controller/rbsf_path_tracking/config/{pure_pursuit,map}_{sim,real}.yaml`; the lookahead
-point is on `/r0/<pure_pursuit|map_controller>/target`.
+point is on `/r0/<pure_pursuit|map_controller>/target`. A track can carry its own tuning in
+`config/tracks/<track>_{sim,real}.yaml`, loaded on top for both laws (`params_file:=` replaces
+everything, `speed:=` still overrides). `eps_oval_single_wall` has one: 3.25 m/s with a longer
+lookahead (0.9 + 0.2 v) to take the hairpin's S-bend, 5.0 s laps in MVSim.
 
 ### Real car
 

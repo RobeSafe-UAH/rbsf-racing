@@ -168,6 +168,9 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   (2026-10-21): Pure Pursuit laps up to 4.5 m/s (46 s laps), 5 m/s exceeds MVSim's grip. MVSim
   shows no understeer, so MAP's `understeer_gradient` is 0 in sim (any positive value
   raised the cross-track error)
+- [x] Per-track tuning (`rbsf_path_tracking/config/tracks/<track>_{sim,real}.yaml`).
+  eps_oval_single_wall: 3.25 m/s, lookahead 0.9 + 0.2 v, 5.0 s laps in MVSim, clean to 3.5 m/s
+  (2026-10-21). Its hairpin S-bend saturates the default lookahead at 3.5 m/s
 - [ ] Known-map mapping (`map_server`) and particle-filter localization, then `platform:=real`
 - [ ] Speed profile (`rbsf_msgs/Trajectory`) and a raceline optimiser
 

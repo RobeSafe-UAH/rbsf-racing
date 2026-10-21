@@ -30,7 +30,7 @@ from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
 import yaml
 
 
-def demo_driver(law, namespace, waypoints, overrides):
+def demo_driver(law, namespace, waypoints, overrides, track):
     """
     One car's line follower outside drive_gate: identity planning plus the path tracker.
 
@@ -39,7 +39,7 @@ def demo_driver(law, namespace, waypoints, overrides):
     return [
         Node(package='rbsf_identity', executable='reference_line', namespace=namespace,
              parameters=[{'waypoints_file': waypoints}]),
-        tracker_node(law, namespace, 'f1tenth', overrides=overrides,
+        tracker_node(law, namespace, 'f1tenth', track, overrides=overrides,
                      remappings=[('localization/odom', 'ground_truth/odom'),
                                  ('drive_gate/auto_cmd', 'drive')]),
     ]
@@ -100,7 +100,7 @@ def launch_setup(context):
         namespaces.insert(0, robot)
     drivers = []
     for namespace in namespaces:
-        drivers += demo_driver(arg('controller'), namespace, waypoints, overrides)
+        drivers += demo_driver(arg('controller'), namespace, waypoints, overrides, str(map_yaml))
     return [
         LogInfo(msg=f'Pure Pursuit demo: {num_cars} cars, {spacing} m apart on {waypoints} '
                     f'({length:.1f} m)'),
