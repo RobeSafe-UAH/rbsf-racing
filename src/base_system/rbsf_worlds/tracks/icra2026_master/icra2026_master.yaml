@@ -1,0 +1,17 @@
+image: icra2026_master.png
+resolution: 0.019
+origin: [-18.658, -1.805, 0.0]
+occupied_thresh: 0.65
+free_thresh: 0.196
+negate: 0
+bridges:
+- start: [0.34, 6.29]
+  end: [13.64, 6.29]
+  deck: [4.56, 7.98]
+  width: 1.14
+  height: 0.7
+  under_cones:
+  - [5.2, 5.79, 5.2, 6.79]
+  - [7.95, 5.79, 7.95, 6.79]
+  - [6.69, 5.4, 6.69, 7.16]
+centerline: icra2026_master_centerline.csv

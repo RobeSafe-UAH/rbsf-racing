@@ -4,7 +4,8 @@ import cv2
 import numpy as np
 import pytest
 from rbsf_worlds.centerline import (
-    centerline, corridor_from_slam_map, driving_direction, loop_length, split_ring, TrackError)
+    centerline, corridor_from_slam_map, driving_direction, loop_length, route_corridor,
+    split_ring, TrackError)
 
 RES = 0.05
 FREE, UNKNOWN, OCC = 254, 205, 0
@@ -84,3 +85,21 @@ def test_driving_direction_from_a_partial_path():
     path = np.c_[5 * np.cos(t), 5 * np.sin(t)]
     assert driving_direction(path) is True
     assert driving_direction(path[::-1]) is False
+
+
+def test_route_corridor_closes_open_borders_and_blocks_branches():
+    img, origin = ring_map()
+    # An open border (dashed wall, 0.17 m gaps) down the middle: two lanes, r 4-5 m and 5-6 m.
+    for start_deg in range(0, 360, 6):
+        cv2.ellipse(img, (160, 160), (100, 100), 0, start_deg, start_deg + 4, OCC, 2)
+    corridor = img == FREE
+    with pytest.raises(TrackError):
+        split_ring(corridor)  # the dashes are islands in one wide corridor
+    outer = route_corridor(corridor, RES, origin, 0.3, [], (5.5, 0.0))
+    split_ring(outer)  # gaps closed: the outer lane alone is a loop
+    assert outer.sum() < 0.6 * corridor.sum()
+    with pytest.raises(TrackError, match='1 boundaries'):
+        split_ring(route_corridor(corridor, RES, origin, 0.3, [(0.0, 4.9, 0.0, 6.2)],
+                                  (5.5, 0.0)))  # blocked across: no longer a loop
+    with pytest.raises(TrackError, match='not inside'):
+        route_corridor(corridor, RES, origin, 0.3, [], (0.0, 0.0))  # infield

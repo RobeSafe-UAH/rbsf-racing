@@ -4,7 +4,16 @@ Turn a drawn track map (thin wall lines on white) into an rbsf_worlds track.
 
 Input: a ROS map yaml + image where the walls are drawn as thin closed lines and everything else
 (inside the infield, outside the track) is free. The drivable corridor is the largest free region
-that does not touch the image border, and must be an annulus (one loop, one infield).
+that does not touch the image border.
+
+The reference line needs an annulus (one loop, one infield). Tracks with more than that get two
+options, applied to the centerline only (the simulator map keeps every wall gap and branch):
+    --close-gaps M   close wall gaps narrower than M metres: open track borders (dashed walls)
+                     the LiDAR sees through but no car fits through
+    --block X0 Y0 X1 Y1
+                     virtual wall segment (map coordinates, repeatable): cuts off the branches
+                     and alternative lanes the reference line does not take, or ties an island
+                     to a wall
 
 Output, next to the input yaml (or in --out-dir):
     <name>.png                 simulator map: corridor free, everything else occupied, edges
@@ -28,7 +37,7 @@ import pathlib
 import cv2
 import numpy as np
 from rbsf_worlds.centerline import (
-    centerline, corridor_from_drawing, corridor_image, loop_length, split_ring,
+    centerline, corridor_from_drawing, corridor_image, loop_length, route_corridor, split_ring,
     write_centerline)
 import yaml
 
@@ -49,6 +58,11 @@ def main():
                         help='Centerline smoothing sigma (m).')
     parser.add_argument('--edge-sigma', type=float, default=1.5,
                         help='Wall edge anti-aliasing sigma (px).')
+    parser.add_argument('--close-gaps', type=float, default=0.0, metavar='M',
+                        help='Close wall gaps narrower than M metres for the centerline.')
+    parser.add_argument('--block', type=float, nargs=4, action='append', default=[],
+                        metavar=('X0', 'Y0', 'X1', 'Y1'),
+                        help='Virtual wall segment for the centerline (repeatable).')
     args = parser.parse_args()
 
     spec = yaml.safe_load(args.map_yaml.read_text())
@@ -59,10 +73,12 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     corridor = corridor_from_drawing(img, spec['occupied_thresh'])
-    infield, outside = split_ring(corridor)
     cv2.imwrite(str(out_dir / f'{args.name}.png'), corridor_image(corridor, args.edge_sigma))
 
-    line = centerline(corridor, infield, outside, spec['resolution'], spec['origin'],
+    route = route_corridor(corridor, spec['resolution'], spec['origin'], args.close_gaps,
+                           args.block, args.start)
+    infield, outside = split_ring(route)
+    line = centerline(route, infield, outside, spec['resolution'], spec['origin'],
                       args.step, args.smooth, np.array(args.start), args.ccw)
     length = loop_length(line)
     widths = line[:, 2] + line[:, 3]

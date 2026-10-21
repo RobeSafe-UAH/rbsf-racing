@@ -57,6 +57,33 @@ def corridor_from_drawing(img, occupied_thresh):
     return labels == max(inner, key=lambda i: stats[i, cv2.CC_STAT_AREA])
 
 
+def route_corridor(corridor, resolution, origin, close_gaps_m, blocks, start):
+    """
+    Corridor a reference line runs in: a sub-corridor of `corridor` (drawn maps), in map units.
+
+    close_gaps_m: wall gaps narrower than this are closed (open track borders: the LiDAR sees
+    through them, no car fits). blocks: (x0, y0, x1, y1) virtual wall segments, cutting off
+    branches the line does not take. Returns the part (4-connected) holding `start`.
+    """
+    walls = (~corridor).astype(np.uint8)
+    if close_gaps_m > 0:
+        size = int(round(close_gaps_m / resolution)) | 1
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
+        walls = cv2.morphologyEx(walls, cv2.MORPH_CLOSE, kernel)
+    scale, offset = pixel_frame(corridor.shape[0], resolution, origin)
+
+    def to_px(x, y):
+        return tuple(int(round(v)) for v in (np.array([x, y]) - offset) / scale)
+
+    for x0, y0, x1, y1 in blocks:
+        cv2.line(walls, to_px(x0, y0), to_px(x1, y1), 1, thickness=3)
+    _, labels = cv2.connectedComponents(1 - walls, connectivity=4)
+    col, row = to_px(*start)
+    if not (0 <= row < labels.shape[0] and 0 <= col < labels.shape[1]) or not labels[row, col]:
+        raise TrackError(f'--start {start} is not inside the corridor')
+    return labels == labels[row, col]
+
+
 def fill_small_holes(mask, max_area_px):
     """Set to True every hole (False region enclosed by `mask`) smaller than `max_area_px`."""
     n, labels, stats, _ = cv2.connectedComponentsWithStats(

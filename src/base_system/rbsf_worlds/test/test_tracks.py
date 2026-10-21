@@ -41,3 +41,16 @@ def test_iros2026_centerline_is_a_closed_loop_inside_the_corridor():
     assert gaps.max() < 0.15
     widths = np.loadtxt(find_waypoints(iros), delimiter=',', comments='#')[:, 2:]
     assert widths.min() > 0.8
+
+
+def test_icra2026_centerlines_are_closed_loops_inside_the_corridor():
+    for name, length in (('icra2026_classic', 80.8), ('icra2026_master', 152.5)):
+        path = find_waypoints(track_yaml(name))
+        assert path.name == f'{name}_centerline.csv'
+        xy, _ = load_waypoints(path)
+        _, total = arc_lengths(xy)
+        assert abs(total - length) < 1.0
+        gaps = np.linalg.norm(np.diff(xy, axis=0, append=xy[:1]), axis=1)
+        assert gaps.max() < 0.15
+        widths = np.loadtxt(path, delimiter=',', comments='#')[:, 2:]
+        assert widths.min() > 0.5

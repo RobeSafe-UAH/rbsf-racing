@@ -20,8 +20,9 @@ mvsim_node runs every vehicle; its own odom/scan/tf topics are remapped to /<ns>
 rbsf_mvsim mvsim_adapter per car turns them into the topics above (see mvsim_adapter.py).
 
 Without world_file, the world is generated from `track` with the ego alone, at the start of the
-track's reference line. The track's cones (rbsf_worlds/cones.py) are drawn into the grid. With
-scenery:=true (and a reference line) the world also gets the race-circuit look of
+track's reference line. The track's cones (rbsf_worlds/cones.py) are drawn into the grid, and
+its bridges (rbsf_mvsim/bridges.py) become ramps and an elevated deck the cars drive over or
+under. With scenery:=true (and a reference line) the world also gets the race-circuit look of
 rbsf_mvsim/scene.py: grass, asphalt, red/white curbs on the walls and a finish line.
 """
 
@@ -36,6 +37,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from rbsf_mvsim.bridges import bridge_elements, load_bridges
 from rbsf_mvsim.scene import scenery
 from rbsf_mvsim.world import opponent_namespace, outline_map, world_xml
 from rbsf_worlds.cones import with_cones
@@ -88,6 +90,7 @@ def launch_setup(context):
         grid = outline_map(with_cones(map_yaml, out_dir), out_dir)
         scene = (scenery(grid, xy, out_dir)
                  if xy is not None and arg('scenery').lower() == 'true' else [])
+        scene += bridge_elements(load_bridges(map_yaml))
         with open(world_file, 'w') as f:
             f.write(world_xml(grid, [(robot, x, y, yaw, 'ego')],
                               follow=robot, work_dir=out_dir, scenery=scene))

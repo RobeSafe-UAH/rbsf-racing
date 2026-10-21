@@ -14,11 +14,21 @@ simulators draw them into the map they load (`rbsf_worlds/cones.py`); the track'
 left untouched. `levine` uses four rows to close the corridors that lead off its loop, so it is a
 closed lap.
 
+A yaml may also declare elevated roads under `bridges:` (`start`/`end` feet of the ramps on the
+road axis, parallel to x or y, `deck: [s0, s1]` along it, `width`, `height`, and optional
+`under_cones` rows `[x0, y0, x1, y1]` on the ground under the deck). The image stays 2D; MVSim
+adds the ramps, the deck, its side rails and the cones under it in 3D, so cars drive over or
+under it (`rbsf_mvsim/bridges.py`). The cones stop only cars at ground level, which is why they
+are not `cones:` (those are walls in the map, at every height). f1tenth_gym has no 3D and drives
+the bridge as a flat crossing, without the cones under it.
+
 | Track | Length | Lines | Source |
 |---|---|---|---|
 | `levine` | 61.8 m (centerline) | centerline | f1tenth_gym_ros `maps/levine*` |
 | `spielberg` | 343.3 m (centerline), 338.1 m (raceline) | centerline, raceline | f1tenth_gym_ros `maps/Spielberg*` |
 | `iros2026` | 209.4 m (centerline) | centerline | IROS 2026 RoboRacer competition map |
+| `icra2026_classic` | 80.8 m (centerline) | centerline | ICRA 2026 RoboRacer Classic Cup map |
+| `icra2026_master` | 152.5 m (centerline) | centerline | ICRA 2026 RoboRacer Master Cup map |
 | `eps_circuit` | 21.1 m (centerline) | centerline | Mapped by the real car (session `20261021_122444`, Cartographer) |
 
 `levine` and `spielberg` come from [f1tenth/f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros) (branch
@@ -32,6 +42,53 @@ generated from it by `scripts/tracks/drawn_track.py` (rerun it if the organisers
     python3 scripts/tracks/drawn_track.py \
         src/base_system/rbsf_worlds/tracks/iros2026/iros2026_original.yaml \
         --name iros2026 --start 32.5 8.3 --ccw
+
+`icra2026_classic` and `icra2026_master` are the ICRA 2026 competition maps, kept as
+`<name>_original.{png,yaml}` (the organisers' PGM, converted losslessly). Unlike iros2026 they
+are not a single loop, so `drawn_track.py` gets two centerline-only options; the generated map
+keeps every wall, gap and branch:
+
+- Dashed walls are the competition's *open track borders*: the LiDAR sees through the gaps but
+  no car fits (gaps under 0.4 m). `--close-gaps 0.4` closes them for the centerline.
+- `--block` segments cut off the branches the reference line does not take. Classic: the left
+  side splits into two lanes and the line takes the inner one (outer lane blocked), and the
+  music-note island is tied to the top wall.
+
+Both are driven counter-clockwise from the bottom straight (corridor 1.4-3.5 m wide on Classic,
+1.0-3.8 m on Master):
+
+    python3 scripts/tracks/drawn_track.py \
+        src/base_system/rbsf_worlds/tracks/icra2026_classic/icra2026_classic_original.yaml \
+        --name icra2026_classic --start -4.87 -6.55 --ccw --close-gaps 0.4 \
+        --block -16.65 -2.84 -14.41 -2.84 --block -4.68 5.90 -4.68 4.76
+
+The Master map has a 0.7 m bridge (the real one is 60-80 cm) over a five-way crossing near its
+centre: the west-east straight climbs onto it, the south-north road passes under it at ground
+level. Its `bridges:` entry (in `_original` too, so regenerating keeps it) has ramps of 4.6 m
+(west, 8.7 deg) and 5.3 m (east, 7.5 deg), as long as the straight allows, and a 3.4 m deck over
+the crossing. Three cone rows stand under the deck: two across the straight (x = 5.20 and 7.95)
+close the road below where the straight's walls stop, so the south-north road is fenced off
+from the space under the ramps, and one along x = 6.69 continues the dashed lane divider
+between the two diamonds, where the bridge road cuts it in the map. Cars at ground level go north
+on its west side, round the northern diamond and come back south on its east side.
+
+The line passes the crossing twice under the deck (north on the divider's west side, back south
+on its east side) and once on it: at the right-hand junction it takes the left exit, the straight
+over the bridge, rather than the long flat loop to the north. A self-crossing line is not a ring,
+so it takes two steps. `drawn_track.py` gives the flat route (straight blocked on both sides of
+the crossing, divider closed); `scripts/tracks/detour_track.py` then replaces, in place, its part
+from the junction with the cheapest centred path over the bridge:
+
+    T=src/base_system/rbsf_worlds/tracks/icra2026_master
+    python3 scripts/tracks/drawn_track.py $T/icra2026_master_original.yaml \
+        --name icra2026_master --start -5.35 0.03 --ccw --close-gaps 0.4 \
+        --block 5.10 7.25 5.10 5.16 --block 8.14 7.25 8.14 5.16 \
+        --block 6.72 7.63 6.72 4.21 --block 6.72 1.26 6.72 0.69
+    python3 scripts/tracks/detour_track.py $T/icra2026_master.yaml \
+        --name icra2026_master --out-dir $T \
+        --leave 15.93 2.88 --rejoin -1.45 10.48 --close-gaps 0.4 \
+        --block 16.31 7.63 18.78 7.63 --block 0.92 10.48 3.39 10.48 \
+        --block 4.82 6.86 8.43 6.86 --block 4.82 5.72 8.43 5.72
 
 `eps_circuit` is the exception to the rule below: a car-mapped track kept so both simulators
 can drive it by name. It is `session_track.py centerline --source cartographer` output, copied

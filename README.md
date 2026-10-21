@@ -60,6 +60,8 @@ to the mapping slot (a SLAM, or the identity when there is none).
 | `levine` | 61.8 m | centerline |
 | `spielberg` | 343.3 m | centerline, raceline (338.1 m, with speed profile) |
 | `iros2026` | 209.4 m | centerline |
+| `icra2026_classic` | 80.8 m | centerline |
+| `icra2026_master` | 152.5 m | centerline (over the 0.7 m bridge; 3D in MVSim only) |
 
 See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sources.
 
