@@ -1,6 +1,13 @@
 # ROS environment for the RBSF Racing container.
 # Sourced by the entrypoint and by every interactive shell (/etc/bash.bashrc).
 
+# The image's copy (/etc/rbsf) hands over to the mounted workspace's copy, so edits to this file
+# (helpers like rviz_slam) apply without `make build`. It is still used without a mounted repo.
+if [ "${BASH_SOURCE[0]}" = /etc/rbsf/ros_env.sh ] && [ -f /ros2_ws/docker/ros_env.sh ]; then
+  source /ros2_ws/docker/ros_env.sh
+  return
+fi
+
 RBSF_WS=/ros2_ws
 
 source "/opt/ros/${ROS_DISTRO}/setup.bash"

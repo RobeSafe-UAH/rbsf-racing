@@ -106,6 +106,9 @@ editing the Dockerfile:
   the Jazzy binaries.
 - The entrypoint warns when the mounted workspace's `package.xml` or Python lock differ from
   what the image was built with. Then you need `make build`.
+- The image's `/etc/rbsf/ros_env.sh` hands over to the mounted `docker/ros_env.sh`, so shell
+  helpers (`cb`, `rviz_slam`, `plot_speed`) change without a rebuild. `entrypoint.sh`,
+  `prompt.sh` and `colcon-defaults.yaml` still need `make build`.
 
 ## Conventions
 
