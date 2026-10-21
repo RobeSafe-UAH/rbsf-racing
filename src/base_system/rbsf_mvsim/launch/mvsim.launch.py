@@ -20,7 +20,9 @@ mvsim_node runs every vehicle; its own odom/scan/tf topics are remapped to /<ns>
 rbsf_mvsim mvsim_adapter per car turns them into the topics above (see mvsim_adapter.py).
 
 Without world_file, the world is generated from `track` with the ego alone, at the start of the
-track's reference line. The track's cones (rbsf_worlds/cones.py) are drawn into the grid.
+track's reference line. The track's cones (rbsf_worlds/cones.py) are drawn into the grid. With
+scenery:=true (and a reference line) the world also gets the race-circuit look of
+rbsf_mvsim/scene.py: grass, asphalt, red/white curbs on the walls and a finish line.
 """
 
 import os
@@ -34,6 +36,7 @@ from launch.conditions import IfCondition
 from launch.substitutions import Command, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
+from rbsf_mvsim.scene import scenery
 from rbsf_mvsim.world import opponent_namespace, outline_map, world_xml
 from rbsf_worlds.cones import with_cones
 from rbsf_worlds.paths import load_waypoints, pose_at
@@ -75,15 +78,19 @@ def launch_setup(context):
     if not world_file:
         map_yaml = resolve_map_yaml(arg('track'))
         try:
-            x, y, yaw = pose_at(load_waypoints(find_waypoints(map_yaml))[0], 0.0)
+            xy = load_waypoints(find_waypoints(map_yaml))[0]
+            x, y, yaw = pose_at(xy, 0.0)
         except FileNotFoundError:
+            xy = None
             x = y = yaw = 0.0
         out_dir = pathlib.Path(tempfile.mkdtemp(prefix='rbsf_mvsim_'))
         world_file = str(out_dir / 'world.xml')
+        grid = outline_map(with_cones(map_yaml, out_dir), out_dir)
+        scene = (scenery(grid, xy, out_dir)
+                 if xy is not None and arg('scenery').lower() == 'true' else [])
         with open(world_file, 'w') as f:
-            grid = outline_map(with_cones(map_yaml, out_dir), out_dir)
             f.write(world_xml(grid, [(robot, x, y, yaw, 'ego')],
-                              follow=robot, work_dir=out_dir))
+                              follow=robot, work_dir=out_dir, scenery=scene))
 
     mvsim = Node(
         package='mvsim',
@@ -146,6 +153,9 @@ def generate_launch_description():
             description='Opponents in world_file (named opponents/or0, ...); one adapter each.'),
         DeclareLaunchArgument(
             'headless', default_value='false', description='Run MVSim without its window.'),
+        DeclareLaunchArgument(
+            'scenery', default_value='true',
+            description='Race-circuit look (grass, curbs, finish line) for generated worlds.'),
         DeclareLaunchArgument(
             'foxglove', default_value='true', description='Start the Foxglove bridge.'),
         DeclareLaunchArgument(

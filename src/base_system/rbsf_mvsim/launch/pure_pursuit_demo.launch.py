@@ -21,6 +21,7 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogI
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from rbsf_mvsim.scene import scenery
 from rbsf_mvsim.world import opponent_namespace, outline_map, world_xml
 from rbsf_worlds.paths import arc_lengths, load_waypoints, spawn_poses
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
@@ -42,7 +43,9 @@ def launch_setup(context):
                 zip(names, spawn_poses(xy, len(names), spacing)))]
     out_dir = pathlib.Path(tempfile.mkdtemp(prefix='rbsf_mvsim_pp_demo_'))
     world_file = out_dir / 'world.xml'
-    world_file.write_text(world_xml(outline_map(map_yaml, out_dir), cars, follow=robot))
+    grid = outline_map(map_yaml, out_dir)
+    world_file.write_text(world_xml(grid, cars, follow=robot, work_dir=out_dir,
+                                    scenery=scenery(grid, xy, out_dir)))
 
     sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(os.path.join(

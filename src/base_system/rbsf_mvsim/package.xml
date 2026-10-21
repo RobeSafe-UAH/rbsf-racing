@@ -17,7 +17,9 @@
   <exec_depend>mvsim</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
   <exec_depend>python3-pil</exec_depend>
+  <exec_depend>python3-scipy</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>rbsf_identity</exec_depend>
   <exec_depend>rbsf_pure_pursuit</exec_depend>

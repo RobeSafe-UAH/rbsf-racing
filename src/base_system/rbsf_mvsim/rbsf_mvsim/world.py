@@ -9,6 +9,7 @@ model RViz shows for f1tenth_gym.
 MVSim's 2D LiDAR misses most walls of maps whose whole outside is occupied (e.g. iros2026, filled
 for f1tenth_gym): rays return max range and the car only finds the wall by hitting it. Launch
 files therefore give MVSim outline_map(), which keeps only the occupied cells next to free space.
+scene.py adds the race-circuit look (ground texture, curbs, lights) on top, from that same grid.
 """
 
 import math
@@ -73,7 +74,7 @@ def outline_map(map_yaml, out_dir, thickness=0.2):
 
 
 def world_xml(map_yaml, cars, follow=None, definitions_dir=None, meshes_dir=None,
-              work_dir=None):
+              work_dir=None, scenery=()):
     """
     Return an MVSim world XML string.
 
@@ -82,6 +83,7 @@ def world_xml(map_yaml, cars, follow=None, definitions_dir=None, meshes_dir=None
     follow: vehicle the GUI camera follows. meshes_dir: the car model's meshes (default: the
     ones of f1tenth_gym_ros, which RViz shows with f1tenth_gym). work_dir: where the per-class
     copies of the accent mesh go (MVSim tints a mesh once per file, not once per vehicle).
+    scenery: extra world elements, e.g. from rbsf_mvsim.scene.scenery().
     """
     if meshes_dir is None:
         meshes_dir = os.path.join(get_package_share_directory('f1tenth_gym_ros'), 'meshes')
@@ -96,6 +98,7 @@ def world_xml(map_yaml, cars, follow=None, definitions_dir=None, meshes_dir=None
     ET.SubElement(gui, 'show_forces').text = 'false'
     if follow:
         ET.SubElement(gui, 'follow_vehicle').text = follow
+    world.extend(scenery)
 
     grid = ET.SubElement(world, 'element', {'class': 'occupancy_grid'})
     ET.SubElement(grid, 'file').text = str(map_yaml)
