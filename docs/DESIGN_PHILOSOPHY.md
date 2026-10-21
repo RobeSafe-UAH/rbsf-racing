@@ -224,7 +224,9 @@ ros2 launch stack_launcher raceline_tracking.launch.py platform:=f1tenth track:=
   track-dependent options.
 - A behaviour may expose implementation options as extra arguments for one slot
   (`compose.include_slots(..., extra={slot: {arg: value}})`). Only that slot receives them, and an implementation
-  that does not declare one ignores it.
+  that does not declare one ignores it. Every include is isolated (`compose.include`): it sees only the arguments passed
+  to it, never the behaviour's other launch configurations. Without that, a behaviour's
+  `params_file` meant for the controller also replaced `drive_gate`'s config.
 - A single **registry** in `stack_launcher` maps `slot -> implementation name -> (package, launch
   file)`. Adding an implementation means adding one registry entry, and every behaviour can then
   use it.

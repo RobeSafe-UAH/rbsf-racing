@@ -3,7 +3,7 @@
 import os
 
 from ament_index_python.packages import get_package_share_directory, PackageNotFoundError
-from launch.actions import IncludeLaunchDescription
+from launch.actions import GroupAction, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from stack_launcher.registry import IMPLEMENTATIONS, SLOTS
 
@@ -20,10 +20,16 @@ def launch_file(package, name):
 
 
 def include(package, name, arguments):
-    """Include share/<package>/launch/<name>, passing `arguments` as strings."""
-    return IncludeLaunchDescription(
+    """
+    Include share/<package>/launch/<name> with only `arguments` (as strings).
+
+    The include is isolated: it sees none of the including file's launch configurations, so a
+    behaviour argument cannot reach an included file that happens to declare one with the same
+    name (e.g. a controller's params_file replacing drive_gate's).
+    """
+    return GroupAction(scoped=True, forwarding=False, actions=[IncludeLaunchDescription(
         PythonLaunchDescriptionSource(launch_file(package, name)),
-        launch_arguments={key: str(value) for key, value in arguments.items()}.items())
+        launch_arguments={key: str(value) for key, value in arguments.items()}.items())])
 
 
 def slot_arguments(slot, robot, platform, track, use_sim_time, extra=None):
