@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>particle_filter</name>
+  <version>0.3.0</version>
+  <description>Particle-filter localization (Monte Carlo Localization) on a known map with RangeLibc ray casting. Vendored from f1tenth/particle_filter and ported to the RBSF Racing localization slot: it owns map -> &lt;ns&gt;/odom.</description>
+  <maintainer email="santimontieleu@gmail.com">santimontiel</maintainer>
+  <license>MIT</license>
+  <author email="coreyhwalsh@gmail.com">Corey Walsh</author>
+  <author email="billyzheng.bz@gmail.com">Hongrui Zheng</author>
+  <url type="repository">https://github.com/f1tenth/particle_filter</url>
+
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>range_libc</exec_depend>
+  <exec_depend>rbsf_identity</exec_depend>
+  <exec_depend>rbsf_worlds</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
