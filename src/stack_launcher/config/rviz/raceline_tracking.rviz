@@ -1,0 +1,159 @@
+# raceline_tracking view of /r0. raceline_tracking.launch.py (rviz:=true) rewrites /r0/ to the
+# robot's namespace and /r0/pure_pursuit/ to the controller node's namespace.
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+    Splitter Ratio: 0.5
+    Tree Height: 555
+  - Class: rviz_common/Views
+    Name: Views
+    Splitter Ratio: 0.5
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.7
+      Class: rviz_default_plugins/Map
+      Color Scheme: map
+      Draw Behind: true
+      Enabled: true
+      Name: Map
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map
+      Use Timestamp: false
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
+      Color: 0; 200; 255
+      Enabled: true
+      Head Diameter: 0.3
+      Head Length: 0.2
+      Length: 0.3
+      Line Style: Billboards
+      Line Width: 0.06
+      Name: Reference line
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0.01
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.03
+      Shaft Diameter: 0.1
+      Shaft Length: 0.1
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/planning/trajectory
+      Value: true
+    - Angle Tolerance: 3.14
+      Class: rviz_default_plugins/Odometry
+      Covariance:
+        Orientation:
+          Value: false
+        Position:
+          Value: false
+        Value: false
+      Enabled: true
+      Keep: 400
+      Name: Driven path
+      Position Tolerance: 0.1
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.1
+        Color: 255; 170; 0
+        Head Length: 0.05
+        Head Radius: 0.05
+        Shaft Length: 0.05
+        Shaft Radius: 0.05
+        Value: Arrow
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/localization/odom
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/PointStamped
+      Color: 255; 40; 40
+      Enabled: true
+      History Length: 1
+      Name: Lookahead target
+      Radius: 0.15
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/pure_pursuit/target
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Description Source: Topic
+      Description Topic:
+        Depth: 5
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/robot_description
+      Enabled: true
+      Name: Car
+      TF Prefix: ""
+      Value: true
+      Visual Enabled: true
+    - Alpha: 1
+      Class: rviz_default_plugins/LaserScan
+      Color: 255; 255; 255
+      Color Transformer: FlatColor
+      Decay Time: 0
+      Enabled: true
+      Name: Scan
+      Position Transformer: XYZ
+      Size (Pixels): 3
+      Size (m): 0.03
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Best Effort
+        Value: /r0/scan
+      Use Fixed Frame: true
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Measure
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
+  Value: true
+  Views:
+    Current:
+      Angle: 0
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Current View
+      Near Clip Distance: 0.01
+      Scale: 25
+      Target Frame: <Fixed Frame>
+      Value: TopDownOrtho (rviz_default_plugins)
+      X: 0
+      Y: 0
+    Saved: ~
+Window Geometry:
+  Height: 900
+  Width: 1300
