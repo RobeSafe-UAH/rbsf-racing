@@ -46,3 +46,36 @@ def test_track_defaults_per_platform():
     assert resolve_track('real', '') == ''
     assert resolve_track('real', '/maps/x/track/t.yaml') == '/maps/x/track/t.yaml'
     assert resolve_track('mvsim', 'iros2026') == 'iros2026'
+
+
+KNOWN_MAP = {**VALID, 'mapping': 'map_server', 'localization': 'particle_filter'}
+
+
+def test_known_map_implementations_are_registered():
+    assert IMPLEMENTATIONS['mapping']['map_server'][0] == 'rbsf_map_manager'
+    assert IMPLEMENTATIONS['localization']['particle_filter'][0] == 'particle_filter'
+
+
+@pytest.mark.parametrize('platform', PLATFORMS)
+@pytest.mark.parametrize('controller', ['pure_pursuit', 'map', 'wall_following'])
+def test_known_map_with_particle_filter_drives_anywhere(platform, controller):
+    validate(platform, 'local', {**KNOWN_MAP, 'controller': controller})
+
+
+@pytest.mark.parametrize('mapping, localization', [
+    ('map_server', 'identity'),         # nobody owns map -> odom
+    ('identity', 'particle_filter'),    # two owners
+    ('dual_slam', 'particle_filter'),
+])
+def test_map_to_odom_has_exactly_one_owner(mapping, localization):
+    with pytest.raises(ValueError, match='known-map mapping'):
+        validate('mvsim', 'local', {**VALID, 'mapping': mapping, 'localization': localization})
+
+
+@pytest.mark.parametrize('controller', ['pure_pursuit', 'map'])
+def test_real_map_frame_controller_needs_a_real_map_pose(controller):
+    with pytest.raises(ValueError, match='cannot place it on the track'):
+        validate('real', 'local', {**VALID, 'controller': controller})
+    # Ground truth makes identity fine on the simulators, and SLAM gives a map pose on the car.
+    validate('mvsim', 'local', {**VALID, 'controller': controller})
+    validate('real', 'local', {**VALID, 'mapping': 'dual_slam', 'controller': controller})

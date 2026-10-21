@@ -6,22 +6,30 @@ on /<robot>/planning/trajectory and the controller tracks it from the map-frame 
 /<robot>/localization/odom.
 
 Slots (defaults, each overridable with <slot>:=<implementation>):
-    mapping       identity      (simulators: /ground_truth/map, identity map -> <robot>/odom)
-    localization  identity      (simulators: ground truth in the map frame)
+    mapping       simulators: identity (/ground_truth/map, identity map -> <robot>/odom)
+                  real:       map_server (the track's map on /map, no TF)
+    localization  simulators: identity (ground truth in the map frame)
+                  real:       particle_filter (RF2O odometry + LiDAR on the map; owns
+                              map -> <robot>/odom)
     perception    identity
     planning      identity      (the track's raceline, else its centerline; line:= picks one)
     controller    pure_pursuit  (map: MAP, Model- and Acceleration-based Pursuit)
 
-Quick start (simulators only for now):
+Quick start:
     ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026
     ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026 controller:=map
     ros2 launch stack_launcher raceline_tracking.launch.py platform:=f1tenth track:=spielberg
+    # The real car's chain in simulation: known map + particle filter instead of ground truth.
+    ros2 launch stack_launcher raceline_tracking.launch.py track:=eps_circuit \
+        mapping:=map_server localization:=particle_filter rviz:=true
+    # On the car (track:= is required: a track name or maps/<stamp>/track/<name>.yaml).
+    ros2 launch stack_launcher raceline_tracking.launch.py platform:=real \
+        deployment:=distributed track:=eps_circuit
 Options: speed:=<m/s> (constant speed), params_file:=<controller yaml>, line:=centerline,
-rviz:=true (RViz framing the track: reference line, lookahead target, driven path, car and scan).
-
-platform:=real is refused: on the car the pose must be localized on the track's map, which needs
-a known-map mapping (map_server) and a particle-filter localization (docs/DESIGN_PHILOSOPHY.md
-§3.2). Neither exists yet.
+initial_pose:=x,y,yaw|global (particle filter start; default the reference line's start, where the
+car is placed; RViz's 2D Pose Estimate re-seeds it),
+rviz:=true (RViz framing the track: reference line, lookahead target, driven path, car, scan and
+the particles).
 """
 
 from launch import LaunchDescription
@@ -42,19 +50,25 @@ DEFAULT_SLOTS = {
     'planning': 'identity',
     'controller': 'pure_pursuit',
 }
+# The real car has no ground truth: it localizes on the track's known map.
+PLATFORM_SLOTS = {'real': {'mapping': 'map_server', 'localization': 'particle_filter'}}
+
+
+def default_slot(platform, slot):
+    """Return the implementation of `slot` when the behaviour gets none on `platform`."""
+    return PLATFORM_SLOTS.get(platform, {}).get(slot, DEFAULT_SLOTS[slot])
 
 
 def launch_setup(context):
     arg = lambda name: LaunchConfiguration(name).perform(context)  # noqa: E731
     platform, deployment = arg('platform'), arg('deployment')
-    slots = {slot: arg(slot) for slot in SLOTS}
+    slots = {slot: arg(slot) or default_slot(platform, slot) for slot in SLOTS}
     validate(platform, deployment, slots)
-    if platform == 'real':
-        raise ValueError(
-            'raceline_tracking does not run on the real car yet: it needs a known-map mapping '
-            '(map_server) and a particle-filter localization to place the car on the track.')
     robot = arg('robot').strip('/')
     track = resolve_track(platform, arg('track'))
+    if not track:
+        raise ValueError('raceline_tracking needs track:= on the real car: an rbsf_worlds track '
+                         'or a session map, maps/<stamp>/track/<name>.yaml')
 
     actions = [LogInfo(msg=f'Raceline tracking on {platform} ({deployment}), /{robot}: '
                            + ', '.join(f'{slot}={name}' for slot, name in slots.items())
@@ -65,6 +79,7 @@ def launch_setup(context):
             'rviz': 'false', 'foxglove': arg('foxglove'), 'joy': arg('joy'),
             'require_deadman': arg('require_deadman')}))
     extra = {'planning': {'line': arg('line')},
+             'localization': {'initial_pose': arg('initial_pose')},
              'controller': {'speed': arg('speed'), 'params_file': arg('params_file')}}
     actions += include_slots(slots, robot, platform, track, USE_SIM_TIME[platform], extra)
     if arg('rviz').lower() == 'true':
@@ -81,7 +96,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'platform', default_value='mvsim',
-            description=f"One of: {', '.join(PLATFORMS)} (real is refused for now)."),
+            description=f"One of: {', '.join(PLATFORMS)}."),
         DeclareLaunchArgument(
             'deployment', default_value='local',
             description=f"One of: {', '.join(DEPLOYMENTS)}. distributed skips the platform "
@@ -91,13 +106,22 @@ def generate_launch_description():
             'track', default_value='',
             description='rbsf_worlds track or map yaml. Default: levine on the simulators.'),
         *[DeclareLaunchArgument(
-            slot, default_value=DEFAULT_SLOTS[slot],
-            description=f"{slot} implementation: {', '.join(IMPLEMENTATIONS[slot])}.")
+            slot, default_value='',
+            description=f"{slot} implementation: {', '.join(IMPLEMENTATIONS[slot])}. Default: "
+                        f'{DEFAULT_SLOTS[slot]}'
+                        + ''.join(f', {impl} on {platform}' for platform, slots in
+                                  PLATFORM_SLOTS.items() for s, impl in slots.items() if s == slot)
+                        + '.')
           for slot in SLOTS],
         DeclareLaunchArgument(
             'line', default_value='auto',
             description="Planning reference line: 'raceline', 'centerline' or 'auto' (raceline "
                         'if the track has one).'),
+        DeclareLaunchArgument(
+            'initial_pose', default_value='',
+            description="Particle filter start pose 'x,y,yaw' (map frame) or 'global'. Default: "
+                        "the start of the track's reference line. RViz 2D Pose Estimate "
+                        're-seeds.'),
         DeclareLaunchArgument(
             'speed', default_value='',
             description='Controller constant speed (m/s). Default: from its config.'),

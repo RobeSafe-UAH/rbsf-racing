@@ -98,8 +98,8 @@ at a glance.
 
 | Slot | Responsibility | Implementations (current / planned) | Identity |
 |---|---|---|---|
-| **mapping** | Provide `/map`. If it does SLAM, or is the identity, it also owns `map -> <ns>/odom`. | `dual_slam`, `slam_toolbox`, `cartographer` (SLAM, `rbsf_dual_slam`); `map_server` (known track from `rbsf_worlds`, planned) | Static identity `map -> <ns>/odom`, and on the simulators `/ground_truth/map` relayed to `/map`. |
-| **localization** | Estimate the car's pose in `map`. | particle filter / AMCL on a known map | `odom` composed with `map -> <ns>/odom` (TF) on `localization/odom`. A real map-frame pose alongside a SLAM mapper, ground truth on the simulators. |
+| **mapping** | Provide `/map`. If it does SLAM, or is the identity, it also owns `map -> <ns>/odom`. | `dual_slam`, `slam_toolbox`, `cartographer` (SLAM, `rbsf_dual_slam`); `map_server` (known track from `rbsf_worlds` or a session, `rbsf_map_manager`, no TF) | Static identity `map -> <ns>/odom`, and on the simulators `/ground_truth/map` relayed to `/map`. |
+| **localization** | Estimate the car's pose in `map`. | `particle_filter` (MCL with RangeLibc on a known map, `state_estimation/particle_filter`, owns `map -> <ns>/odom`) | `odom` composed with `map -> <ns>/odom` (TF) on `localization/odom`. A real map-frame pose alongside a SLAM mapper, ground truth on the simulators. |
 | **perception** | Detect opponents and obstacles. | LiDAR opponent detection | Publishes an empty opponent list at a fixed rate. |
 | **planning** | Produce the trajectory to follow: global line, overtaking, avoidance. | raceline / overtaking planner | Republishes the track's reference line (`rbsf_worlds`, `track:=`) as the trajectory (`reference_line`). Empty without a track. |
 | **controller** | Turn trajectory + pose (or raw scan, for reactive controllers) into an Ackermann command. | `pure_pursuit`, `map` (`rbsf_path_tracking`), `wall_following`, `follow_the_gap` | Publishes zero commands (speed 0, steering 0). The car stays still. |
@@ -109,8 +109,12 @@ at a glance.
 - **SLAM** (exploration, teleop mapping). Mapping is a SLAM (`dual_slam` by default) and
   publishes `/map` and `map -> <ns>/odom`. Localization is identity and composes that TF with
   `odom`.
-- **Known map** (racing). Mapping is `map_server` (static `/map` from `rbsf_worlds`).
-  Localization is a particle filter and owns `map -> <ns>/odom`.
+- **Known map** (racing). Mapping is `map_server` (static `/map` from `rbsf_worlds`, or a
+  car-mapped session's `maps/<stamp>/track/`). Localization is `particle_filter` and owns
+  `map -> <ns>/odom`; it is fed by the platform `odom` (RF2O on the car) and the scan, and
+  `odom_relay` composes its TF with `odom` into `localization/odom` at the odometry rate.
+  `registry.check_map_frame` rejects a known-map mapping without a map localizer and the
+  reverse (no owner, or two).
 - **Simulators with ground truth.** Mapping and localization are both identity. The identity
   mapping publishes the identity `map -> <ns>/odom` (exact, since sim odometry is ground truth).
 
@@ -233,9 +237,10 @@ ros2 launch stack_launcher raceline_tracking.launch.py platform:=mvsim track:=ir
 - Launch files use `OpaqueFunction` + `launch_setup(context)`. They validate `platform`,
   `deployment` and every slot value against the registry, and raise on unknown values. A
   combination where a consumer needs something no provider gives (e.g. a controller that needs a
-  `map`-frame pose with `localization:=identity` on `platform:=real` and no SLAM mapper) should
-  also be rejected. Only `raceline_tracking` checks it so far: it refuses `platform:=real`
-  until a known-map mapping and localization exist.
+  `map`-frame pose with `localization:=identity` on `platform:=real` and no SLAM mapper) is
+  also rejected: `validate` ends with `registry.check_map_frame`, which also enforces the single
+  owner of `map -> <ns>/odom`. A behaviour can default slots per platform: `raceline_tracking`
+  uses identity on the simulators and `map_server` + `particle_filter` on `real`.
 
 Planned behaviours (legacy equivalents in parentheses):
 
@@ -382,7 +387,9 @@ src/
   state_estimation/  # mapping + localization slots, odometry estimators
     rbsf_dual_slam/      # mapping: slam_toolbox, cartographer, dual_slam; map saver
     rf2o_laser_odometry/ # RF2O laser odometry (Jazzy port, GPL-3.0), real-car odom
-    ...                  # (planned) particle filter
+    rbsf_map_manager/    # mapping: map_server (known track map, no TF)
+    particle_filter/     # localization: MCL (port of f1tenth/particle_filter, MIT)
+    range_libc/          # RangeLibc ray casting for the particle filter (Apache-2.0)
   perception/        # opponent detection, ...
   planning/          # planners, ...
   controller/        # rbsf_path_tracking, rbsf_wall_following, rbsf_follow_the_gap, ...

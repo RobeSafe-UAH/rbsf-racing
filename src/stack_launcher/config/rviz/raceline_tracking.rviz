@@ -128,6 +128,26 @@ Visualization Manager:
         Value: /r0/scan
       Use Fixed Frame: true
       Value: true
+    - Alpha: 1
+      Arrow Length: 0.15
+      Axes Length: 0.3
+      Axes Radius: 0.01
+      Class: rviz_default_plugins/PoseArray
+      Color: 255; 170; 0
+      Enabled: true
+      Head Length: 0.05
+      Head Radius: 0.03
+      Name: Particles
+      Shaft Length: 0.1
+      Shaft Radius: 0.01
+      Shape: Arrow (Flat)
+      Topic:
+        Depth: 1
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/pf/viz/particles
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -138,6 +158,16 @@ Visualization Manager:
     - Class: rviz_default_plugins/Interact
     - Class: rviz_default_plugins/MoveCamera
     - Class: rviz_default_plugins/Measure
+    - Class: rviz_default_plugins/SetInitialPose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.16
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/initialpose
   Transformation:
     Current:
       Class: rviz_default_plugins/TF

@@ -171,7 +171,15 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
 - [x] Per-track tuning (`rbsf_path_tracking/config/tracks/<track>_{sim,real}.yaml`).
   eps_oval_single_wall: 3.25 m/s, lookahead 0.9 + 0.2 v, 5.0 s laps in MVSim, clean to 3.5 m/s
   (2026-10-21). Its hairpin S-bend saturates the default lookahead at 3.5 m/s
-- [ ] Known-map mapping (`map_server`) and particle-filter localization, then `platform:=real`
+- [x] Known-map mapping (`mapping:=map_server`, `rbsf_map_manager`) and particle-filter
+  localization (`localization:=particle_filter`), the defaults of `raceline_tracking` on
+  `platform:=real`. Verified in MVSim on eps_circuit with ground-truth odom (2026-10-21): 7 laps
+  at ~2 m/s, no collisions, 6 cm / 1.2 deg RMSE against ground truth (a ~2-3 cm along-track
+  bias, under half a 5 cm map cell), 0.3 s recovery from a 0.5 m / 20 deg kick, 10 ms updates.
+  Global initialization (`initial_pose:=global`) locks onto the wrong part of eps_circuit, so the
+  filter starts at the reference line's start by default
+- [ ] Raceline tracking on the real car (RF2O + particle filter; needs Milestone 1's real-car
+  validation first)
 - [ ] Speed profile (`rbsf_msgs/Trajectory`) and a raceline optimiser
 
 ## Decisions
@@ -205,6 +213,12 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   look; `centerline --source <map>` builds the track in `maps/<stamp>/track/` and refuses failed
   maps without `--force`. It ports the legacy `scripts/centerline` tools: the algorithm lives in
   `rbsf_worlds/centerline.py`, shared with `scripts/tracks/drawn_track.py`. Decided 2026-10-01.
+- Known-map localization: `particle_filter` (`src/state_estimation/particle_filter`, port of
+  f1tenth/particle_filter `humble-devel`, MIT, see its `PORTING.md`) on `range_libc` (vendored
+  `ament_cmake` Cython build, Apache-2.0, CPU methods only), fed by the platform `odom` (RF2O on
+  the car) and the scan. It owns `map -> <ns>/odom`; the known map comes from nav2's
+  `map_server` (`rbsf_map_manager`), which publishes no TF. `registry.check_map_frame` enforces
+  exactly one owner. Decided 2026-10-21.
 - Tracks (maps + reference lines) and world/map tools live in the shared `rbsf_worlds` package;
   simulators and controllers take `track:=<name>`. Reference lines are closed loops ordered in the
   driving direction. Decided 2026-10-01.

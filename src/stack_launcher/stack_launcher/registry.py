@@ -16,9 +16,11 @@ IMPLEMENTATIONS = {
         'slam_toolbox': ('rbsf_dual_slam', 'slam_toolbox.launch.py'),
         'cartographer': ('rbsf_dual_slam', 'cartographer.launch.py'),
         'dual_slam': ('rbsf_dual_slam', 'dual_slam.launch.py'),
+        'map_server': ('rbsf_map_manager', 'map_server.launch.py'),
     },
     'localization': {
         'identity': ('rbsf_identity', 'localization.launch.py'),
+        'particle_filter': ('particle_filter', 'particle_filter.launch.py'),
     },
     'perception': {
         'identity': ('rbsf_identity', 'perception.launch.py'),
@@ -34,6 +36,14 @@ IMPLEMENTATIONS = {
         'map': ('rbsf_path_tracking', 'map.launch.py'),
     },
 }
+
+# Who owns map -> <ns>/odom (docs/DESIGN_PHILOSOPHY.md §3.2): SLAM and identity mappers do; a
+# known-map mapper does not, and then a map localizer must.
+SLAM_MAPPERS = ('slam_toolbox', 'cartographer', 'dual_slam')
+KNOWN_MAP_MAPPERS = ('map_server',)
+MAP_LOCALIZERS = ('particle_filter',)
+# Controllers that steer from the map-frame pose (localization/odom) rather than the scan.
+MAP_FRAME_CONTROLLERS = ('pure_pursuit', 'map')
 
 # Track of each platform when the behaviour gets none. The simulators need a world; the real car
 # drives an unknown track.
@@ -65,3 +75,27 @@ def validate(platform, deployment, slots):
     for slot, name in slots.items():
         check_choice('slot', slot, SLOTS)
         check_choice(f'{slot} implementation', name, tuple(IMPLEMENTATIONS[slot]))
+    check_map_frame(platform, slots)
+
+
+def check_map_frame(platform, slots):
+    """
+    Raise ValueError unless exactly one slot owns map -> <ns>/odom and map-frame consumers get one.
+
+    A map localizer needs a known-map mapper, and a known-map mapper needs a map localizer (else
+    two or no TF owners). On the real car identity mapping means map = odom, so a controller that
+    follows the map frame needs a SLAM mapper or a map localizer to place the car on the track.
+    """
+    mapping, localization = slots['mapping'], slots['localization']
+    if (localization in MAP_LOCALIZERS) != (mapping in KNOWN_MAP_MAPPERS):
+        raise ValueError(
+            f'mapping:={mapping} with localization:={localization}: a known-map mapping '
+            f"({', '.join(KNOWN_MAP_MAPPERS)}) pairs with a map localization "
+            f"({', '.join(MAP_LOCALIZERS)}), which owns map -> odom; other mappings own it "
+            'themselves and need localization:=identity.')
+    if (platform == 'real' and slots['controller'] in MAP_FRAME_CONTROLLERS
+            and localization not in MAP_LOCALIZERS and mapping not in SLAM_MAPPERS):
+        raise ValueError(
+            f"controller:={slots['controller']} follows the map frame, but on the real car "
+            f'mapping:={mapping} + localization:={localization} cannot place it on the track. '
+            f'Use mapping:={KNOWN_MAP_MAPPERS[0]} localization:={MAP_LOCALIZERS[0]}.')
