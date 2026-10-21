@@ -1,0 +1,22 @@
+# Pure Pursuit parameters for the real car (not tested on the car yet).
+# The wildcard applies them in every car namespace (/r0/pure_pursuit, ...).
+# See rbsf_path_tracking/path_tracker_node.py.
+/**:
+  ros__parameters:
+    steering_law: pure_pursuit
+    # Constant speed (m/s). drive_gate clips it to its max_auto_speed (2.0 on the car).
+    speed: 1.0
+    # Lookahead distance L = min(lookahead_min + lookahead_gain * speed, lookahead_max) (m, s).
+    # Shorter cuts corners less: 0.8 + 0.25 v clipped Levine's tightest corner in MVSim.
+    lookahead_min: 0.5
+    lookahead_gain: 0.2
+    lookahead_max: 3.0
+    # Vehicle: wheelbase (m, same as the other real-car controllers; measure it) and steering
+    # limit (rad).
+    wheelbase: 0.33
+    max_steering: 0.4189
+    # Control loop rate (Hz) and the odometry age (s) after which the car is not driven
+    # (drive_gate then stops it).
+    rate: 50.0
+    odom_timeout: 0.5
+    start_at: 0.0

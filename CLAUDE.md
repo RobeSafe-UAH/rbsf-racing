@@ -159,6 +159,18 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   `deployment:=local|distributed`
 - [ ] Real-car validation (design doc §6.4 checklist, then wall-following gains)
 
+**Milestone 2 — raceline tracking (sim first).** Follow a pre-built track's reference line
+(legacy `03_centerline_tracking`), behaviour `raceline_tracking`. Status:
+- [x] Identity planning publishes the track's reference line on `planning/trajectory`
+  (`nav_msgs/Path`, constant speed until `rbsf_msgs/Trajectory`)
+- [x] Path-tracking controllers `pure_pursuit` and `map` (`rbsf_path_tracking`, one node, two
+  steering laws; MAP ported from RobeSafe-UAH/tfg-ruben-lopez). Verified in MVSim on iros2026
+  (2026-10-21): Pure Pursuit laps up to 4.5 m/s (46 s laps), 5 m/s exceeds MVSim's grip. MVSim
+  shows no understeer, so MAP's `understeer_gradient` is 0 in sim (any positive value
+  raised the cross-track error)
+- [ ] Known-map mapping (`map_server`) and particle-filter localization, then `platform:=real`
+- [ ] Speed profile (`rbsf_msgs/Trajectory`) and a raceline optimiser
+
 ## Decisions
 
 - ROS 2 Jazzy on Ubuntu 24.04 (Python 3.12). Decided 2026-10-01.

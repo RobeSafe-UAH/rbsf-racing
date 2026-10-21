@@ -165,7 +165,7 @@ python3 scripts/maps/session_track.py inspect maps/<stamp>
 #   -> maps/<stamp>/inspection.png (look at it) + inspection.yaml, and a recommended source
 python3 scripts/maps/session_track.py centerline maps/<stamp> --source cartographer
 #   -> maps/<stamp>/track/<track>_<stamp>.{png,yaml}, _centerline.csv, centerline.png
-ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/track/<name>.yaml
+ros2 launch stack_launcher raceline_tracking.launch.py track:=/ros2_ws/maps/<stamp>/track/<name>.yaml
 ```
 
 - `inspect` checks every map: the cleaned free space must be one closed corridor (an unclosed
@@ -232,6 +232,37 @@ ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py track:=/ros2_ws/maps/<stamp>/
 - In simulation the car drives without a joystick (`require_deadman` defaults to `false`). With
   a gamepad plugged in, LB + sticks takes over at any time.
 
+### Raceline tracking
+
+The car follows the track's reference line (legacy `03_centerline_tracking`). The identity
+planning publishes it on `/r0/planning/trajectory` (`nav_msgs/Path`, the raceline if the track
+has one, else the centerline), and the controller tracks it from `/r0/localization/odom` into
+`drive_gate`. Simulators only for now: on the car the pose must be localized on the track's map
+(`map_server` + particle filter, not implemented), so `platform:=real` is refused.
+
+```bash
+ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026                   # Pure Pursuit
+ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026 controller:=map   # MAP
+#   platform:=mvsim|f1tenth  speed:=<m/s>  line:=auto|raceline|centerline  params_file:=<yaml>
+```
+
+Both controllers are one node, `rbsf_path_tracking`'s `path_tracker`, with the same topics and
+parameters and a different `steering_law`. Each aims at the waypoint a lookahead
+`L = min(lookahead_min + lookahead_gain * speed, lookahead_max)` ahead, whose arc has curvature
+`k = 2 y / L^2` (`y` its lateral offset):
+
+- `pure_pursuit`: `delta = atan(wheelbase * k)`, the kinematic steering of that arc.
+- `map` (Model- and Acceleration-based Pursuit, ForzaETH; ported from
+  [tfg-ruben-lopez](https://github.com/RobeSafe-UAH/tfg-ruben-lopez)): it asks for the arc's
+  lateral acceleration at the measured speed, `a = v^2 k`, and inverts a steady-state
+  single-track model, `delta = atan(wheelbase * k) + understeer_gradient * a`. The extra term
+  steers more as the tyres slip in fast corners. With `understeer_gradient: 0` it is Pure Pursuit.
+
+The speed is constant (`speed`): `nav_msgs/Path` has no speed profile (that comes with
+`rbsf_msgs/Trajectory`). Parameters are in
+`src/controller/rbsf_path_tracking/config/{pure_pursuit,map}_{sim,real}.yaml`; the lookahead
+point is on `/r0/<pure_pursuit|map_controller>/target`.
+
 ### Real car
 
 ```bash
@@ -278,14 +309,16 @@ feature-poor synthetic worlds.
 
 ### Pure Pursuit demo
 
-Every car follows the track's raceline (or its centerline when there is none) with
-`rbsf_pure_pursuit`, spawned `spacing` metres apart along it with the ego last. All cars set off
+Every car follows the track's raceline (or its centerline when there is none) at a constant
+speed with `rbsf_path_tracking` (`controller:=pure_pursuit|map`), spawned `spacing` metres apart
+along it with the ego last. Unlike `raceline_tracking`, each car's tracker drives `drive` from its
+ground truth, without `drive_gate`. All cars set off
 together `start_delay` seconds after launch. The same command works on both simulators:
 
 ```bash
 ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py                       # Levine, centerline, 2 m/s
-ros2 launch rbsf_f1tenth_gym pure_pursuit_demo.launch.py track:=spielberg  # raceline x 0.6
-#   num_opponents:=3  spacing:=5.0  speed:=2.0  speed_scale:=0.6  line:=auto|raceline|centerline
+ros2 launch rbsf_f1tenth_gym pure_pursuit_demo.launch.py track:=spielberg  # raceline, 2 m/s
+#   num_opponents:=3  spacing:=5.0  speed:=2.0  controller:=pure_pursuit|map  line:=auto|raceline|centerline
 #   ego_driver:=false  start_delay:=5.0
 ```
 
@@ -293,7 +326,7 @@ With `ego_driver:=false` the ego is yours to drive (opponents will lap it if it 
 Pursuit has no obstacle avoidance, so cars only keep their gaps at equal speeds. On MVSim, Spielberg's
 raceline (which passes 0.25 m from the walls at its apexes) makes the cars graze a few walls; use
 `line:=centerline speed:=3.0` there for a contact-free run. Its gains are in
-`src/controller/rbsf_pure_pursuit/config/pure_pursuit_sim.yaml`.
+`src/controller/rbsf_path_tracking/config/{pure_pursuit,map}_sim.yaml`.
 
 ### f1tenth_gym
 

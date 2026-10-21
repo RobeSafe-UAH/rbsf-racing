@@ -101,8 +101,8 @@ at a glance.
 | **mapping** | Provide `/map`. If it does SLAM, or is the identity, it also owns `map -> <ns>/odom`. | `dual_slam`, `slam_toolbox`, `cartographer` (SLAM, `rbsf_dual_slam`); `map_server` (known track from `rbsf_worlds`, planned) | Static identity `map -> <ns>/odom`, and on the simulators `/ground_truth/map` relayed to `/map`. |
 | **localization** | Estimate the car's pose in `map`. | particle filter / AMCL on a known map | `odom` composed with `map -> <ns>/odom` (TF) on `localization/odom`. A real map-frame pose alongside a SLAM mapper, ground truth on the simulators. |
 | **perception** | Detect opponents and obstacles. | LiDAR opponent detection | Publishes an empty opponent list at a fixed rate. |
-| **planning** | Produce the trajectory to follow: global line, overtaking, avoidance. | raceline / overtaking planner | Republishes the track's reference line (`rbsf_worlds`, `track:=`) as the trajectory. |
-| **controller** | Turn trajectory + pose (or raw scan, for reactive controllers) into an Ackermann command. | `pure_pursuit`, `wall_following`, `follow_the_gap` | Publishes zero commands (speed 0, steering 0). The car stays still. |
+| **planning** | Produce the trajectory to follow: global line, overtaking, avoidance. | raceline / overtaking planner | Republishes the track's reference line (`rbsf_worlds`, `track:=`) as the trajectory (`reference_line`). Empty without a track. |
+| **controller** | Turn trajectory + pose (or raw scan, for reactive controllers) into an Ackermann command. | `pure_pursuit`, `map` (`rbsf_path_tracking`), `wall_following`, `follow_the_gap` | Publishes zero commands (speed 0, steering 0). The car stays still. |
 
 **Mapping owns SLAM.** Exactly one component publishes `map -> <ns>/odom`:
 
@@ -210,7 +210,7 @@ An **app** = behaviour + `platform` + `deployment` + one implementation per slot
 ```bash
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed
-ros2 launch stack_launcher raceline_tracking.launch.py platform:=f1tenth track:=spielberg controller:=pure_pursuit
+ros2 launch stack_launcher raceline_tracking.launch.py platform:=mvsim track:=iros2026 controller:=map
 ```
 
 ### 5.1 Behaviour launch files
@@ -234,8 +234,8 @@ ros2 launch stack_launcher raceline_tracking.launch.py platform:=f1tenth track:=
   `deployment` and every slot value against the registry, and raise on unknown values. A
   combination where a consumer needs something no provider gives (e.g. a controller that needs a
   `map`-frame pose with `localization:=identity` on `platform:=real` and no SLAM mapper) should
-  also be rejected. This is not checked yet, because no such consumer exists: wall following
-  only reads `scan`.
+  also be rejected. Only `raceline_tracking` checks it so far: it refuses `platform:=real`
+  until a known-map mapping and localization exist.
 
 Planned behaviours (legacy equivalents in parentheses):
 
@@ -244,7 +244,7 @@ Planned behaviours (legacy equivalents in parentheses):
 | `teleop_mapping` (`00_teleop_slam`) | dual_slam | identity | identity | identity | identity |
 | `wall_following` (`01_wall_following`) | identity | identity | identity | identity | wall_following |
 | `autonomous_exploration` (`02_autonomous_slam`) | dual_slam | identity | identity | identity | wall_following (or follow_the_gap) |
-| `raceline_tracking` (`03_centerline_tracking`) | map_server | particle filter (identity in sim) | identity | identity | pure_pursuit |
+| `raceline_tracking` (`03_centerline_tracking`) | map_server (identity in sim) | particle filter (identity in sim) | identity | identity | pure_pursuit (or map) |
 
 ### 5.2 Deployment
 
@@ -385,7 +385,7 @@ src/
     ...                  # (planned) particle filter
   perception/        # opponent detection, ...
   planning/          # planners, ...
-  controller/        # rbsf_pure_pursuit, rbsf_wall_following, rbsf_follow_the_gap, ...
+  controller/        # rbsf_path_tracking, rbsf_wall_following, rbsf_follow_the_gap, ...
   common/
     rbsf_identity/       # identity implementation of every slot
     rbsf_msgs/           # (planned) stack messages
@@ -396,7 +396,7 @@ src/
 - One implementation per package (or a few closely related ones). The package depends only on
   its slot contract, `rbsf_worlds` and `rbsf_msgs`.
 - Tests: pure algorithm code is kept separate from the ROS node (as in
-  `rbsf_pure_pursuit/pure_pursuit.py`) and unit-tested. `rbsf_safety` gets exhaustive state
+  `rbsf_path_tracking/tracking.py`) and unit-tested. `rbsf_safety` gets exhaustive state
   machine tests.
 
 ## 8. Rationale and rejected alternatives
@@ -431,14 +431,15 @@ src/
   as "explore one lap, save the map, switch to raceline tracking") beyond launch composition.
 - How STOPPED's "brake active" maps to the VESC (brake current vs. zero speed). Today STOPPED
   sends speed 0, which the VESC's speed loop holds.
-- Neutral outputs of the identity components (§3.3). Today the identities launch nothing,
-  except mapping (identity `map -> <ns>/odom`, `/ground_truth/map` relay) and localization
-  (`odom_relay`, `odom` in `map` on `localization/odom`). The empty opponent list,
-  the reference-line trajectory and the zero command come with `rbsf_msgs` and their first
-  consumer.
+- Neutral outputs of the identity components (§3.3). Today the perception and controller
+  identities launch nothing. Mapping publishes the identity `map -> <ns>/odom` and relays
+  `/ground_truth/map`, localization relays `odom` in `map` on `localization/odom` (`odom_relay`),
+  and planning publishes the track's reference line as a `nav_msgs/Path` (`reference_line`, no
+  speed profile). The empty opponent list and the zero command come with `rbsf_msgs` and their
+  first consumer.
 - Migration of what exists today:
-  - `rbsf_pure_pursuit` loads its waypoint CSV itself and publishes `drive`. It should read
-    `planning/trajectory` and `localization/odom` and publish `drive_gate/auto_cmd`.
-  - The `pure_pursuit_demo.launch.py` files should become `stack_launcher` behaviours.
+  - The multi-car `pure_pursuit_demo.launch.py` files still bypass `drive_gate` (each car's
+    tracker publishes `drive` from its ground truth). Single-car line following is the
+    `raceline_tracking` behaviour.
   - The simulators' teleop path (`cmd_vel` straight into MVSim / the gym bridge) should go
     through `drive_gate`.

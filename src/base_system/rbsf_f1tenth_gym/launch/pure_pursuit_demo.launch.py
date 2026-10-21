@@ -1,13 +1,14 @@
 """
-Demo: every car follows the map's raceline/centerline with Pure Pursuit.
+Demo: every car follows the map's raceline/centerline with Pure Pursuit (or MAP).
 
 Spawns the ego (/<robot>) and `num_opponents` opponents (/opponents/or<i>) on the reference
 line, `spacing` metres apart along it (ego last, opponents ahead of it), each heading along the
-line. Then starts one rbsf_pure_pursuit node per car in its namespace (ground_truth/odom ->
-drive), on top of f1tenth_gym.launch.py (see it for the full topic list).
+line. Then starts, per car in its namespace, rbsf_identity's reference_line (planning/trajectory)
+and rbsf_path_tracking's tracker with steering law `controller` (ground_truth/odom -> drive,
+bypassing drive_gate), on top of f1tenth_gym.launch.py (see it for the full topic list).
 
-The reference line is <map>_raceline.csv when the map has one (speed profile x speed_scale), else
-its centerline (constant `speed`). With ego_driver:=false the ego is left to you
+The reference line is <map>_raceline.csv when the map has one, else its centerline; the cars
+drive it at the constant `speed`. With ego_driver:=false the ego is left to you
 (keyboard teleop or your own stack on /<robot>/drive); opponents will lap it if it stops.
 """
 
@@ -23,9 +24,25 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from rbsf_f1tenth_gym.naming import opponent_namespace
+from rbsf_path_tracking.launch_common import tracker_node
 from rbsf_worlds.paths import arc_lengths, load_waypoints, spawn_poses
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
 import yaml
+
+
+def demo_driver(law, namespace, waypoints, overrides):
+    """
+    One car's line follower outside drive_gate: identity planning plus the path tracker.
+
+    The tracker reads the ground truth (the line is in the map frame) and drives `drive` directly.
+    """
+    return [
+        Node(package='rbsf_identity', executable='reference_line', namespace=namespace,
+             parameters=[{'waypoints_file': waypoints}]),
+        tracker_node(law, namespace, 'f1tenth', overrides=overrides,
+                     remappings=[('localization/odom', 'ground_truth/odom'),
+                                 ('drive_gate/auto_cmd', 'drive')]),
+    ]
 
 
 def launch_setup(context):
@@ -72,12 +89,8 @@ def launch_setup(context):
             get_package_share_directory('rbsf_identity'), 'launch', 'mapping.launch.py')),
         launch_arguments={'robot': robot, 'platform': 'f1tenth'}.items(),
     )
-    pure_pursuit_config = os.path.join(
-        get_package_share_directory('rbsf_pure_pursuit'), 'config', 'pure_pursuit_sim.yaml')
     overrides = {
-        'waypoints_file': waypoints,
         'speed': float(arg('speed')),
-        'speed_scale': float(arg('speed_scale')),
         # Same wall-clock start for every car: one that sets off before the car ahead of it
         # closes the gap (and rear-ends it).
         'start_at': time.time() + float(arg('start_delay')),
@@ -85,16 +98,9 @@ def launch_setup(context):
     namespaces = [opponent_namespace(i) for i in range(num_opponents)]
     if arg('ego_driver').lower() == 'true':
         namespaces.insert(0, robot)
-    drivers = [
-        Node(
-            package='rbsf_pure_pursuit',
-            executable='pure_pursuit',
-            namespace=namespace,
-            parameters=[pure_pursuit_config, overrides],
-            remappings=[('odom', 'ground_truth/odom')],  # the line is in the map frame
-        )
-        for namespace in namespaces
-    ]
+    drivers = []
+    for namespace in namespaces:
+        drivers += demo_driver(arg('controller'), namespace, waypoints, overrides)
     return [
         LogInfo(msg=f'Pure Pursuit demo: {num_cars} cars, {spacing} m apart on {waypoints} '
                     f'({length:.1f} m)'),
@@ -121,15 +127,16 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'waypoints', default_value='', description='Waypoint CSV; overrides map and line.'),
         DeclareLaunchArgument(
-            'speed', default_value='2.0', description='Constant speed on a centerline (m/s).'),
+            'speed', default_value='2.0', description='Constant speed (m/s).'),
         DeclareLaunchArgument(
-            'speed_scale', default_value='0.6', description='Scale of the raceline speeds.'),
+            'controller', default_value='pure_pursuit',
+            description="Steering law: 'pure_pursuit' or 'map'."),
         DeclareLaunchArgument(
             'start_delay', default_value='5.0',
             description='Seconds after launch before the cars start driving (all at once).'),
         DeclareLaunchArgument(
             'ego_driver', default_value='true',
-            description='Drive the ego with Pure Pursuit too.'),
+            description='Drive the ego with the controller too.'),
         DeclareLaunchArgument('rviz', default_value='true', description='Start RViz.'),
         DeclareLaunchArgument(
             'foxglove', default_value='true', description='Start the Foxglove bridge.'),

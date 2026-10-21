@@ -1,13 +1,13 @@
 """
-Demo: every car follows the track's raceline/centerline with Pure Pursuit, on MVSim.
+Demo: every car follows the track's raceline/centerline with Pure Pursuit (or MAP), on MVSim.
 
 Same demo as rbsf_f1tenth_gym's pure_pursuit_demo.launch.py, with MVSim as the simulator: spawns
 the ego (/<robot>) and `num_opponents` opponents (/opponents/or<i>) on the reference line,
-`spacing` metres apart along it (ego last), and starts one rbsf_pure_pursuit node per car in its
+`spacing` metres apart along it (ego last), and starts the same line follower per car in its
 namespace (ground_truth/odom -> drive). See mvsim.launch.py for the topics.
 
-The reference line is <track>_raceline.csv when the track has one (speed profile x speed_scale),
-else its centerline (constant `speed`). With ego_driver:=false the ego is left to you.
+The reference line is <track>_raceline.csv when the track has one, else its centerline; the cars
+drive it at the constant `speed`. With ego_driver:=false the ego is left to you.
 """
 
 import os
@@ -23,8 +23,24 @@ from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from rbsf_mvsim.scene import scenery
 from rbsf_mvsim.world import opponent_namespace, outline_map, world_xml
+from rbsf_path_tracking.launch_common import tracker_node
 from rbsf_worlds.paths import arc_lengths, load_waypoints, spawn_poses
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
+
+
+def demo_driver(law, namespace, waypoints, overrides):
+    """
+    One car's line follower outside drive_gate: identity planning plus the path tracker.
+
+    The tracker reads the ground truth (the line is in the map frame) and drives `drive` directly.
+    """
+    return [
+        Node(package='rbsf_identity', executable='reference_line', namespace=namespace,
+             parameters=[{'waypoints_file': waypoints}]),
+        tracker_node(law, namespace, 'mvsim', overrides=overrides,
+                     remappings=[('localization/odom', 'ground_truth/odom'),
+                                 ('drive_gate/auto_cmd', 'drive')]),
+    ]
 
 
 def launch_setup(context):
@@ -64,22 +80,15 @@ def launch_setup(context):
             get_package_share_directory('rbsf_identity'), 'launch', 'mapping.launch.py')),
         launch_arguments={'robot': robot, 'platform': 'mvsim'}.items(),
     )
-    pure_pursuit_config = os.path.join(
-        get_package_share_directory('rbsf_pure_pursuit'), 'config', 'pure_pursuit_sim.yaml')
     overrides = {
-        'waypoints_file': waypoints,
         'speed': float(arg('speed')),
-        'speed_scale': float(arg('speed_scale')),
         # Same wall-clock start for every car: one that sets off before the car ahead of it
         # closes the gap (and rear-ends it).
         'start_at': time.time() + float(arg('start_delay')),
     }
-    drivers = [
-        Node(package='rbsf_pure_pursuit', executable='pure_pursuit', namespace=name,
-             parameters=[pure_pursuit_config, overrides],
-             remappings=[('odom', 'ground_truth/odom')])  # the line is in the map frame
-        for name in (names if arg('ego_driver').lower() == 'true' else names[1:])
-    ]
+    drivers = []
+    for name in (names if arg('ego_driver').lower() == 'true' else names[1:]):
+        drivers += demo_driver(arg('controller'), name, waypoints, overrides)
     return [
         LogInfo(msg=f'Pure Pursuit demo (MVSim): {len(names)} cars, {spacing} m apart on '
                     f'{waypoints} ({length:.1f} m)'),
@@ -105,12 +114,13 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'waypoints', default_value='', description='Waypoint CSV; overrides track and line.'),
         DeclareLaunchArgument(
-            'speed', default_value='2.0', description='Constant speed on a centerline (m/s).'),
+            'speed', default_value='2.0', description='Constant speed (m/s).'),
         DeclareLaunchArgument(
-            'speed_scale', default_value='0.6', description='Scale of the raceline speeds.'),
+            'controller', default_value='pure_pursuit',
+            description="Steering law: 'pure_pursuit' or 'map'."),
         DeclareLaunchArgument(
             'ego_driver', default_value='true',
-            description='Drive the ego with Pure Pursuit too.'),
+            description='Drive the ego with the controller too.'),
         DeclareLaunchArgument(
             'start_delay', default_value='5.0',
             description='Seconds after launch before the cars start driving (all at once).'),

@@ -38,6 +38,12 @@ def arc_lengths(xy):
     return np.concatenate(([0.0], np.cumsum(segments[:-1]))), float(segments.sum())
 
 
+def headings(xy):
+    """Yaw (rad) of each waypoint: the direction to the next one, wrapping around."""
+    step = np.roll(xy, -1, axis=0) - xy
+    return np.arctan2(step[:, 1], step[:, 0])
+
+
 def pose_at(xy, s):
     """Interpolate (x, y, yaw) at distance `s` along the closed path."""
     cumulative, length = arc_lengths(xy)

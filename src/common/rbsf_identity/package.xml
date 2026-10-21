@@ -7,9 +7,11 @@
   <maintainer email="santimontieleu@gmail.com">santimontiel</maintainer>
   <license>Apache-2.0</license>
 
+  <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>launch</exec_depend>
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>rbsf_worlds</exec_depend>
   <exec_depend>rclpy</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
 

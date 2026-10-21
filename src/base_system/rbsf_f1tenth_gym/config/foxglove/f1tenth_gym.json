@@ -245,7 +245,7 @@
           ],
           "pointSize": 5
         },
-        "/r0/pure_pursuit/path": {
+        "/r0/planning/trajectory": {
           "visible": true,
           "type": "line",
           "lineWidth": 0.05,
@@ -526,7 +526,7 @@
           ],
           "pointSize": 5
         },
-        "/r0/pure_pursuit/path": {
+        "/r0/planning/trajectory": {
           "visible": true,
           "type": "line",
           "lineWidth": 0.05,

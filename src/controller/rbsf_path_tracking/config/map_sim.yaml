@@ -1,0 +1,26 @@
+# MAP (Model- and Acceleration-based Pursuit) parameters for the simulators (MVSim, f1tenth_gym).
+# The wildcard applies them in every car namespace (/r0/map_controller, ...).
+# See rbsf_path_tracking/path_tracker_node.py.
+/**:
+  ros__parameters:
+    steering_law: map
+    # Constant speed (m/s). drive_gate clips it to its max_auto_speed.
+    speed: 2.0
+    # Lookahead distance L = min(lookahead_min + lookahead_gain * speed, lookahead_max) (m, s).
+    lookahead_min: 0.5
+    lookahead_gain: 0.2
+    lookahead_max: 3.0
+    # Steering added per unit of lateral acceleration (rad per m/s^2): delta = atan(wheelbase k)
+    # + understeer_gradient * v^2 k. 0 is Pure Pursuit. MVSim's car does not understeer below its
+    # grip limit: on iros2026 at 4 m/s, 0.01 / 0.02 / 0.04 raised the cross-track error RMS from
+    # 3.3 cm to 6.4 / 9.0 / 11.8 cm, and at 4.5 m/s two of the three crashed (2026-10-21).
+    understeer_gradient: 0.0
+    # Vehicle (F1TENTH): wheelbase lf + lr (m) and steering limit (rad).
+    wheelbase: 0.3302
+    max_steering: 0.4189
+    # Control loop rate (Hz) and the odometry age (s) after which the car is not driven
+    # (drive_gate then stops it).
+    rate: 50.0
+    odom_timeout: 0.5
+    # Wall-clock start time (s since the epoch), set by the demos so all cars start together.
+    start_at: 0.0

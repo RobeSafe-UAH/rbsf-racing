@@ -186,16 +186,17 @@ The track is self-contained: launch files take it as `track:=<path to <name>.yam
 Before trusting a generated track, drive it in MVSim (laptop, dev image):
 
 ```bash
-ros2 launch rbsf_mvsim pure_pursuit_demo.launch.py \
-    track:=/ros2_ws/maps/<stamp>/track/<name>.yaml num_opponents:=0
+ros2 launch stack_launcher raceline_tracking.launch.py \
+    track:=/ros2_ws/maps/<stamp>/track/<name>.yaml
 ```
 
-MVSim builds its world from the cleaned map, and Pure Pursuit follows the centerline. The car
+MVSim builds its world from the cleaned map, and Pure Pursuit follows the centerline
+(`controller:=map` for MAP, `speed:=<m/s>` to go faster). The car
 must lap without touching a wall (`/r0/collision` stays false). In the iros2026 rehearsal the
 generated track ran 129 m in 70 s without a collision.
 
-**This demo is simulation only.** `rbsf_pure_pursuit` still publishes `drive` directly, bypassing
-`drive_gate`. Never run it on the car.
+**This is simulation only.** `raceline_tracking` refuses `platform:=real`: the car needs to be
+localized on the track's map first (below).
 
 ## Not implemented yet
 
@@ -204,11 +205,11 @@ track:
 
 - **Known-map mapping and localization on the car**: mapping slot `map_server` (the track's
   map) and a particle-filter localization slot that owns `map -> r0/odom`.
-- **Planning**: a planning slot that publishes the track's line (`planning/trajectory`), and a
-  raceline optimised from the centerline.
-- **Controller migration**: `rbsf_pure_pursuit` reading `planning/trajectory` and
-  `localization/odom`, and publishing `drive_gate/auto_cmd`.
-- **A `raceline_tracking` behaviour** that ties them together (design doc §5.1).
+- **Planning**: a raceline optimised from the centerline, with a speed profile (the identity
+  planning publishes the centerline as is, and the controllers drive it at constant speed).
+- **`raceline_tracking` on `platform:=real`**: the behaviour and both controllers
+  (`pure_pursuit`, `map`) exist and are verified in MVSim, but are refused on the car until the
+  two slots above exist.
 
 ## Troubleshooting
 

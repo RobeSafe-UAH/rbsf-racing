@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 import pytest
-from rbsf_worlds.paths import arc_lengths, load_waypoints, pose_at, spawn_poses
+from rbsf_worlds.paths import arc_lengths, headings, load_waypoints, pose_at, spawn_poses
 
 
 def test_load_centerline_and_raceline(tmp_path):
@@ -37,3 +37,8 @@ def test_spawn_poses_are_spaced_along_the_path_with_ego_last():
     assert spawn_poses(square, 2, 12.0)[1] == pytest.approx((10.0, 2.0, math.pi / 2))
     with pytest.raises(ValueError):
         spawn_poses(square, 5, 10.0)
+
+
+def test_headings_point_to_the_next_waypoint_and_wrap():
+    square = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+    assert headings(square) == pytest.approx([0.0, math.pi / 2, math.pi, -math.pi / 2])
