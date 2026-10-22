@@ -205,8 +205,9 @@ track:
 
 - **Known-map mapping and localization on the car**: mapping slot `map_server` (the track's
   map) and a particle-filter localization slot that owns `map -> r0/odom`.
-- **Planning**: a raceline optimised from the centerline, with a speed profile (the identity
-  planning publishes the centerline as is, and the controllers drive it at constant speed).
+- **Planning**: a raceline optimised from the centerline, with its own speed profile (the
+  identity planning publishes the centerline as is, and the controllers drive it with their
+  curvature-based speed profile).
 - **`raceline_tracking` on `platform:=real`**: the behaviour and both controllers
   (`pure_pursuit`, `map`) exist and are verified in MVSim, but are refused on the car until the
   two slots above exist.

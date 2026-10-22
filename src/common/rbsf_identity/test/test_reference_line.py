@@ -3,7 +3,7 @@ import math
 from builtin_interfaces.msg import Time
 import numpy as np
 import pytest
-from rbsf_identity.reference_line import path_msg
+from rbsf_identity.reference_line import path_msg, trajectory_msg
 
 
 def test_path_heads_along_the_line_in_the_map_frame():
@@ -18,3 +18,17 @@ def test_path_heads_along_the_line_in_the_map_frame():
 
 def test_no_line_gives_an_empty_path():
     assert path_msg([], Time()).poses == []
+
+
+def test_trajectory_carries_the_raceline_speeds_in_the_map_frame():
+    square = np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
+    trajectory = trajectory_msg(square, np.array([1.0, 2.0, 3.0, 4.0]), Time(sec=7))
+    assert trajectory.header.frame_id == 'map' and trajectory.header.stamp.sec == 7
+    assert [[w.point.x, w.point.y] for w in trajectory.waypoints] == square.tolist()
+    assert [w.speed for w in trajectory.waypoints] == [1.0, 2.0, 3.0, 4.0]
+
+
+def test_a_line_without_speeds_leaves_them_unset():
+    trajectory = trajectory_msg(np.array([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]), None, Time())
+    assert all(math.isnan(w.speed) for w in trajectory.waypoints)
+    assert trajectory_msg([], None, Time()).waypoints == []

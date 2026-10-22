@@ -4,8 +4,20 @@
 /**:
   ros__parameters:
     steering_law: pure_pursuit
-    # Constant speed (m/s). drive_gate clips it to its max_auto_speed.
+    # Speed profile (speed_profile.py): top speed on straights (m/s), slower where the
+    # curvature needs it. drive_gate clips it to its max_auto_speed.
     speed: 2.0
+    # Floor of the profile (m/s).
+    min_speed: 0.5
+    # Corner speed v = sqrt(max_lateral_acceleration / |k|) (m/s^2), with the curvature k
+    # measured over the points curvature_spacing m before and after each waypoint (m).
+    max_lateral_acceleration: 8.0
+    curvature_spacing: 0.5
+    # Acceleration and braking limits along the line (m/s^2).
+    max_acceleration: 3.0
+    max_deceleration: 5.0
+    # The speed command is the profile this far ahead, at the measured speed (s).
+    speed_preview: 0.2
     # Lookahead distance L = min(lookahead_min + lookahead_gain * speed, lookahead_max) (m, s).
     # Shorter cuts corners less: 0.8 + 0.25 v clipped Levine's tightest corner in MVSim.
     lookahead_min: 0.5

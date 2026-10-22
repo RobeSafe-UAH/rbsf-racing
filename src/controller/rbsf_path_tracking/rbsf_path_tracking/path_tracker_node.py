@@ -7,31 +7,38 @@ debug topic.
 
 Subscribes  localization/odom      nav_msgs/Odometry (pose of base_link, the rear axle, in map;
                                    twist in base_link)
-            planning/trajectory    nav_msgs/Path (closed loop in the driving direction, map frame,
-                                   transient local)
+            planning/trajectory    rbsf_msgs/Trajectory (closed loop in the driving direction,
+                                   map frame, transient local; NaN speeds = no target)
 Publishes   drive_gate/auto_cmd    ackermann_msgs/AckermannDriveStamped
             ~/target               geometry_msgs/PointStamped (current lookahead point)
+            ~/trajectory           rbsf_msgs/Trajectory (the tracked line with the speed profile
+                                   it drives, transient local)
 
 Algorithm, at `rate` Hz once a trajectory and fresh odometry (< odom_timeout s old) have arrived
 (and, if `start_at` is set, once that wall-clock time has passed, so several cars can set off
 together). Without them it publishes nothing, and drive_gate stops the car:
+    0. On a new trajectory or new profile parameters, compute the speed profile
+       (speed_profile.py): the curvature limit sqrt(max_lateral_acceleration / |k|), clipped by the
+       planner's target speeds and [min_speed, speed], then acceleration and braking passes.
     1. Find the waypoint nearest to the car.
-    2. Walk forward along the path to the first waypoint at least L away, where
+    2. Speed: the profile at the waypoint `speed_preview` seconds ahead at the measured speed
+       (covers the drivetrain's lag when braking into a corner).
+    3. Walk forward along the path to the first waypoint at least L away, where
        L = min(lookahead_min + lookahead_gain * speed, lookahead_max) at the commanded speed.
-    3. Steer towards it with `steering_law` (tracking.py), clipped to max_steering:
+    4. Steer towards it with `steering_law` (tracking.py), clipped to max_steering:
        pure_pursuit  delta = atan(wheelbase * k), k = 2 y / L^2 the arc curvature
        map           delta = atan(wheelbase * k) + understeer_gradient * v^2 k, at the measured
                      speed v (Model- and Acceleration-based Pursuit)
-    4. Speed: the constant `speed`. nav_msgs/Path carries no speed profile; it comes with
-       rbsf_msgs/Trajectory (docs/DESIGN_PHILOSOPHY.md §4.1).
 """
 
 import time
 
 from ackermann_msgs.msg import AckermannDriveStamped
 from geometry_msgs.msg import PointStamped
-from nav_msgs.msg import Odometry, Path
+from nav_msgs.msg import Odometry
 import numpy as np
+from rbsf_msgs.msg import Trajectory, Waypoint
+from rbsf_path_tracking.speed_profile import speed_profile
 from rbsf_path_tracking.tracking import (
     lookahead_distance, lookahead_index, nearest_index, steering_angle, STEERING_LAWS)
 import rclpy
@@ -39,13 +46,23 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
 
+PROFILE_PARAMETERS = ('speed', 'min_speed', 'max_lateral_acceleration', 'max_acceleration',
+                      'max_deceleration', 'curvature_spacing')
+
 
 class PathTrackerNode(Node):
 
     def __init__(self):
         super().__init__('path_tracker')
         self.declare_parameter('steering_law', 'pure_pursuit')
+        # Speed profile: top speed (straights), floor, and the car's acceleration limits.
         self.declare_parameter('speed', 2.0)
+        self.declare_parameter('min_speed', 0.5)
+        self.declare_parameter('max_lateral_acceleration', 4.0)
+        self.declare_parameter('max_acceleration', 3.0)
+        self.declare_parameter('max_deceleration', 4.0)
+        self.declare_parameter('curvature_spacing', 0.5)
+        self.declare_parameter('speed_preview', 0.2)
         self.declare_parameter('lookahead_min', 0.8)
         self.declare_parameter('lookahead_gain', 0.25)
         self.declare_parameter('lookahead_max', 3.0)
@@ -63,25 +80,62 @@ class PathTrackerNode(Node):
                 f"Unknown steering_law '{self.law}'. Valid options: {', '.join(STEERING_LAWS)}")
 
         self.xy = None
+        self.target_speeds = None
         self.frame = None
+        self.profile = None
+        self.profile_key = None
         self.pose = None  # x, y, yaw, measured speed
         self.odom_received = 0.0  # monotonic receive time
         self.drive_pub = self.create_publisher(AckermannDriveStamped, 'drive_gate/auto_cmd', 10)
         self.target_pub = self.create_publisher(PointStamped, '~/target', 10)
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-        self.create_subscription(Path, 'planning/trajectory', self.path_callback, latched)
+        self.profile_pub = self.create_publisher(Trajectory, '~/trajectory', latched)
+        self.create_subscription(
+            Trajectory, 'planning/trajectory', self.trajectory_callback, latched)
         self.create_subscription(Odometry, 'localization/odom', self.odom_callback, 10)
         self.create_timer(1.0 / self.get_parameter('rate').value, self.control)
         self.get_logger().info(f'Steering law: {self.law}')
 
-    def path_callback(self, msg):
-        if len(msg.poses) < 3:
+    def trajectory_callback(self, msg):
+        if len(msg.waypoints) < 3:
             self.xy = None
-            self.get_logger().warn(f'Trajectory has {len(msg.poses)} poses: not driving')
+            self.get_logger().warn(f'Trajectory has {len(msg.waypoints)} waypoints: not driving')
             return
-        self.xy = np.array([(p.pose.position.x, p.pose.position.y) for p in msg.poses])
+        self.xy = np.array([(w.point.x, w.point.y) for w in msg.waypoints])
+        self.target_speeds = np.array([w.speed for w in msg.waypoints])
         self.frame = msg.header.frame_id
-        self.get_logger().info(f'Trajectory: {len(self.xy)} poses in {self.frame}')
+        self.profile_key = None
+        targets = np.count_nonzero(~np.isnan(self.target_speeds))
+        self.get_logger().info(
+            f'Trajectory: {len(self.xy)} waypoints in {self.frame}, {targets} with target speeds')
+
+    def update_profile(self):
+        """Recompute the speed profile if the trajectory or its parameters changed."""
+        key = tuple(self.get_parameter(name).value for name in PROFILE_PARAMETERS)
+        if key == self.profile_key:
+            return self.profile is not None
+        self.profile_key = key
+        top, floor, lateral, acceleration, deceleration, spacing = key
+        if min(top, floor, lateral, acceleration, deceleration, spacing) <= 0.0:
+            self.profile = None
+            self.get_logger().error(
+                f'Speed profile parameters must be positive ({dict(zip(PROFILE_PARAMETERS, key))})'
+                ': not driving')
+            return False
+        self.profile = speed_profile(self.xy, top, floor, lateral, acceleration, deceleration,
+                                     spacing, self.target_speeds)
+        self.get_logger().info(
+            f'Speed profile: {self.profile.min():.2f} to {self.profile.max():.2f} m/s')
+
+        trajectory = Trajectory()
+        trajectory.header.stamp = self.get_clock().now().to_msg()
+        trajectory.header.frame_id = self.frame
+        for (x, y), speed in zip(self.xy, self.profile):
+            waypoint = Waypoint(speed=float(speed))
+            waypoint.point.x, waypoint.point.y = float(x), float(y)
+            trajectory.waypoints.append(waypoint)
+        self.profile_pub.publish(trajectory)
+        return True
 
     def odom_callback(self, msg):
         q = msg.pose.pose.orientation
@@ -103,11 +157,14 @@ class PathTrackerNode(Node):
             return
         if time.time() < self.get_parameter('start_at').value:
             return
+        if not self.update_profile():
+            return
         param = lambda name: self.get_parameter(name).value  # noqa: E731
         x, y, yaw, measured_speed = self.pose
         position = np.array([x, y])
-        speed = param('speed')
         nearest = nearest_index(self.xy, position)
+        preview = max(measured_speed, 0.0) * param('speed_preview')
+        speed = float(self.profile[lookahead_index(self.xy, nearest, position, preview)])
         lookahead = lookahead_distance(
             speed, param('lookahead_min'), param('lookahead_gain'), param('lookahead_max'))
         target = self.xy[lookahead_index(self.xy, nearest, position, lookahead)]

@@ -1,0 +1,8 @@
+# Path-tracking tuning for iros2026 on the simulators, loaded on top of <law>_sim.yaml for both
+# steering laws (launch_common.py). MVSim, 2026-10-22, flying laps with the speed profile:
+# - max_lateral_acceleration 5 / 8 / 10 at 6-7 m/s top: 46.5 / 39.2 / 36.7 s (constant 4.5 m/s
+#   was 46 s); 12 crashes in the first corner. The default 8 keeps a margin.
+# - Top speed 7 -> 8 m/s gains only 0.6 s (38.6 s).
+/**:
+  ros__parameters:
+    speed: 7.0

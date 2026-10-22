@@ -4,8 +4,22 @@
 /**:
   ros__parameters:
     steering_law: map
-    # Constant speed (m/s). drive_gate clips it to its max_auto_speed (2.0 on the car).
+    # Speed profile (speed_profile.py): top speed on straights (m/s), slower where the
+    # curvature needs it. drive_gate clips it to its max_auto_speed (2.0 on the car).
     speed: 1.0
+    # Floor of the profile (m/s). Never below 0.8 on the car: slower commands fall in the
+    # VESC deadband and the car may not move.
+    min_speed: 0.8
+    # Corner speed v = sqrt(max_lateral_acceleration / |k|) (m/s^2), with the curvature k
+    # measured over the points curvature_spacing m before and after each waypoint (m).
+    # Conservative until identified on the car.
+    max_lateral_acceleration: 3.0
+    curvature_spacing: 0.5
+    # Acceleration and braking limits along the line (m/s^2).
+    max_acceleration: 2.0
+    max_deceleration: 3.0
+    # The speed command is the profile this far ahead, at the measured speed (s).
+    speed_preview: 0.2
     # Lookahead distance L = min(lookahead_min + lookahead_gain * speed, lookahead_max) (m, s).
     lookahead_min: 0.5
     lookahead_gain: 0.2

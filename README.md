@@ -263,13 +263,17 @@ parameters and a different `steering_law`. Each aims at the waypoint a lookahead
   single-track model, `delta = atan(wheelbase * k) + understeer_gradient * a`. The extra term
   steers more as the tyres slip in fast corners. With `understeer_gradient: 0` it is Pure Pursuit.
 
-The speed is constant (`speed`): `nav_msgs/Path` has no speed profile (that comes with
-`rbsf_msgs/Trajectory`). Parameters are in
+Both laws drive a curvature-based speed profile (`speed_profile.py`): the corner speed
+`sqrt(max_lateral_acceleration / |k|)`, capped by `speed` (the top speed) and the planner's target
+speeds (`rbsf_msgs/Trajectory`; the raceline's, none on a centerline), floored by `min_speed`,
+then limited by `max_acceleration` / `max_deceleration` so the car brakes before corners. The
+profile it drives is on `/r0/<pure_pursuit|map_controller>/trajectory`. Parameters are in
 `src/controller/rbsf_path_tracking/config/{pure_pursuit,map}_{sim,real}.yaml`; the lookahead
 point is on `/r0/<pure_pursuit|map_controller>/target`. A track can carry its own tuning in
 `config/tracks/<track>_{sim,real}.yaml`, loaded on top for both laws (`params_file:=` replaces
-everything, `speed:=` still overrides). `eps_oval_single_wall` has one: 3.25 m/s with a longer
-lookahead (0.9 + 0.2 v) to take the hairpin's S-bend, 5.0 s laps in MVSim.
+everything, `speed:=` still overrides). `eps_oval_single_wall` has one: 4.5 m/s top with a longer
+lookahead (0.9 + 0.2 v) to take the hairpin's S-bend, 4.65 s laps in MVSim; `iros2026` runs
+7 m/s top (39 s laps).
 
 ### Real car
 

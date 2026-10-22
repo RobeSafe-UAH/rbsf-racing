@@ -73,6 +73,7 @@ def launch_description(law):
             'params_file', default_value='',
             description='Parameter YAML, replacing the platform and track configs.'),
         DeclareLaunchArgument(
-            'speed', default_value='', description='Constant speed (m/s); default from config.'),
+            'speed', default_value='',
+            description='Top speed of the speed profile (m/s); default from config.'),
         OpaqueFunction(function=launch_setup),
     ])

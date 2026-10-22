@@ -180,7 +180,11 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   filter starts at the reference line's start by default
 - [ ] Raceline tracking on the real car (RF2O + particle filter; needs Milestone 1's real-car
   validation first)
-- [ ] Speed profile (`rbsf_msgs/Trajectory`) and a raceline optimiser
+- [x] `rbsf_msgs/Trajectory` on `planning/trajectory` (waypoints with a point and a target speed)
+  and a curvature-based speed profile in `rbsf_path_tracking` (`speed_profile.py`). MVSim
+  (2026-10-22), `max_lateral_acceleration: 8`: iros2026 39.2 s flying laps at 7 m/s top (constant
+  4.5 m/s: 46 s; 12 m/s^2 crashes), eps_oval_single_wall 4.65 s at 4.5 m/s top (was 5.0 s)
+- [ ] Raceline optimiser
 
 ## Decisions
 
@@ -219,6 +223,9 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   the car) and the scan. It owns `map -> <ns>/odom`; the known map comes from nav2's
   `map_server` (`rbsf_map_manager`), which publishes no TF. `registry.check_map_frame` enforces
   exactly one owner. Decided 2026-10-21.
+- `planning/trajectory` is `rbsf_msgs/Trajectory`: a header plus `Waypoint[]`, each a
+  `geometry_msgs/Point` and a target speed (m/s, an upper bound; NaN = none). Controllers compute
+  their own curvature-based speed profile under it. Decided 2026-10-22.
 - Tracks (maps + reference lines) and world/map tools live in the shared `rbsf_worlds` package;
   simulators and controllers take `track:=<name>`. Reference lines are closed loops ordered in the
   driving direction. Decided 2026-10-01.
@@ -240,6 +247,7 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
 
 Confirm these with the user before assuming:
 - Whether performance-critical nodes move to C++ (`ament_cmake`).
-- The rest of `docs/DESIGN_PHILOSOPHY.md` §9 (`rbsf_msgs` types, runtime orchestrator, VESC brake).
+- The rest of `docs/DESIGN_PHILOSOPHY.md` §9 (`OpponentArray` / `GateState`, runtime orchestrator,
+  VESC brake).
 
 Move each item to **Decisions** once it is settled.

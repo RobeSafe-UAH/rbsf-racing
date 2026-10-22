@@ -180,7 +180,7 @@ internals.
 | Direction | Topic | Type | Notes |
 |---|---|---|---|
 | in | `/map`, `localization/odom`, `perception/opponents` | | Plus the track's reference line from `rbsf_worlds` (`track:=`) |
-| out | `planning/trajectory` | *proposed* `rbsf_msgs/Trajectory` (poses + target speeds) | Frame `map`. A closed loop in the driving direction for global lines. |
+| out | `planning/trajectory` | `rbsf_msgs/Trajectory` (`Waypoint[]`: point + target speed, NaN = none) | Frame `map`, transient local. A closed loop in the driving direction for global lines. Identity planning also publishes it as `nav_msgs/Path` on `planning/trajectory/path` for RViz. |
 
 **Controller**
 
@@ -189,9 +189,10 @@ internals.
 | in | `planning/trajectory`, `localization/odom` | | Reactive controllers may use `scan` instead |
 | out | `drive_gate/auto_cmd` | `ackermann_msgs/AckermannDriveStamped` | **Never `drive`.** At the control rate. `drive_gate` stops the car if it goes stale (§6). |
 
-`nav_msgs/Path` cannot carry speeds, and no standard message describes opponents, so those two
-types go in a future `rbsf_msgs` package (§9). Until it exists, implementations may use
-`nav_msgs/Path` and a fixed speed parameter.
+`nav_msgs/Path` cannot carry speeds and no standard message describes opponents, so the stack
+defines its own types in `rbsf_msgs` (`src/common/rbsf_msgs`). `Trajectory` exists; the others
+are still open (§9). A waypoint's speed is an upper bound: controllers may drive slower (their
+own curvature and acceleration limits), never faster.
 
 ### 4.2 Rules for every implementation
 
@@ -395,7 +396,7 @@ src/
   controller/        # rbsf_path_tracking, rbsf_wall_following, rbsf_follow_the_gap, ...
   common/
     rbsf_identity/       # identity implementation of every slot
-    rbsf_msgs/           # (planned) stack messages
+    rbsf_msgs/           # stack messages (Waypoint, Trajectory)
   stack_launcher/    # behaviours, platform.launch.py, implementation registry
 ```
 
@@ -433,7 +434,7 @@ src/
 
 - Whether performance-critical nodes move to C++ (`ament_cmake`). This would also reopen
   in-process plugins (§8).
-- The `rbsf_msgs` definitions: `Trajectory` (poses + speeds), `OpponentArray`, `GateState`.
+- The remaining `rbsf_msgs` definitions: `OpponentArray`, `GateState` (`Trajectory` exists).
 - Whether behaviours need a runtime orchestrator (lifecycle management, or a state machine such
   as "explore one lap, save the map, switch to raceline tracking") beyond launch composition.
 - How STOPPED's "brake active" maps to the VESC (brake current vs. zero speed). Today STOPPED
@@ -441,8 +442,8 @@ src/
 - Neutral outputs of the identity components (§3.3). Today the perception and controller
   identities launch nothing. Mapping publishes the identity `map -> <ns>/odom` and relays
   `/ground_truth/map`, localization relays `odom` in `map` on `localization/odom` (`odom_relay`),
-  and planning publishes the track's reference line as a `nav_msgs/Path` (`reference_line`, no
-  speed profile). The empty opponent list and the zero command come with `rbsf_msgs` and their
+  and planning publishes the track's reference line as an `rbsf_msgs/Trajectory`
+  (`reference_line`, the raceline's speeds or none). The empty opponent list and the zero command come with `rbsf_msgs` and their
   first consumer.
 - Migration of what exists today:
   - The multi-car `pure_pursuit_demo.launch.py` files still bypass `drive_gate` (each car's

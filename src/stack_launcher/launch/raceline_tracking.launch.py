@@ -25,7 +25,7 @@ Quick start:
     # On the car (track:= is required: a track name or maps/<stamp>/track/<name>.yaml).
     ros2 launch stack_launcher raceline_tracking.launch.py platform:=real \
         deployment:=distributed track:=eps_circuit
-Options: speed:=<m/s> (constant speed), params_file:=<controller yaml>, line:=centerline,
+Options: speed:=<m/s> (top speed of the profile), params_file:=<controller yaml>, line:=centerline,
 initial_pose:=x,y,yaw|global (particle filter start; default the reference line's start, where the
 car is placed; RViz's 2D Pose Estimate re-seeds it),
 rviz:=true (RViz framing the track: reference line, lookahead target, driven path, car, scan and
@@ -124,7 +124,8 @@ def generate_launch_description():
                         're-seeds.'),
         DeclareLaunchArgument(
             'speed', default_value='',
-            description='Controller constant speed (m/s). Default: from its config.'),
+            description='Controller top speed (m/s): the speed profile slows down for corners. '
+                        'Default: from its config.'),
         DeclareLaunchArgument(
             'params_file', default_value='',
             description='Controller parameter YAML. Default: its _sim/_real config.'),

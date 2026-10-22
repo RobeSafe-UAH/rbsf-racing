@@ -5,18 +5,20 @@ Runs inside a car's namespace (/r0, ...). The launch file resolves `waypoints_fi
 track (rbsf_worlds: its raceline, else its centerline, unless `line` says which). The line is
 already a closed loop in the driving direction, in the map frame of the track's map.
 
-Publishes   planning/trajectory  nav_msgs/Path (frame map, transient local; each pose heads to
-                                 the next waypoint)
+Publishes   planning/trajectory       rbsf_msgs/Trajectory (frame map, transient local; each
+                                      waypoint's speed is the raceline's, NaN on a centerline)
+            planning/trajectory/path  nav_msgs/Path (the same line for RViz, transient local;
+                                      each pose heads to the next waypoint)
 
-Without a waypoints file (no track, e.g. the real car) it publishes an empty Path: "no
-trajectory", which controllers treat as "do not drive" (docs/DESIGN_PHILOSOPHY.md §3.3). The
-raceline's speed profile is dropped: nav_msgs/Path cannot carry it (rbsf_msgs/Trajectory, §4.1).
+Without a waypoints file (no track, e.g. the real car) it publishes an empty trajectory: "no
+trajectory", which controllers treat as "do not drive" (docs/DESIGN_PHILOSOPHY.md §3.3).
 """
 
 import math
 
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import Path
+from rbsf_msgs.msg import Trajectory, Waypoint
 from rbsf_worlds.paths import headings, load_waypoints
 import rclpy
 from rclpy.executors import ExternalShutdownException
@@ -26,6 +28,19 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 LATCHED = QoSProfile(
     depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
 MAP_FRAME = 'map'
+
+
+def trajectory_msg(xy, speeds, stamp):
+    """rbsf_msgs/Trajectory in the map frame through the (N, 2) waypoints `xy`."""
+    trajectory = Trajectory()
+    trajectory.header.stamp = stamp
+    trajectory.header.frame_id = MAP_FRAME
+    for i, (x, y) in enumerate(xy):
+        waypoint = Waypoint()
+        waypoint.point.x, waypoint.point.y = float(x), float(y)
+        waypoint.speed = float(speeds[i]) if speeds is not None else math.nan
+        trajectory.waypoints.append(waypoint)
+    return trajectory
 
 
 def path_msg(xy, stamp):
@@ -50,13 +65,18 @@ class ReferenceLine(Node):
         self.declare_parameter('waypoints_file', '')
         waypoints_file = self.get_parameter('waypoints_file').value
         if waypoints_file:
-            xy, _ = load_waypoints(waypoints_file)
-            self.get_logger().info(f'Trajectory: {len(xy)} waypoints from {waypoints_file}')
+            xy, speeds = load_waypoints(waypoints_file)
+            profile = 'with' if speeds is not None else 'without'
+            self.get_logger().info(
+                f'Trajectory: {len(xy)} waypoints {profile} speeds from {waypoints_file}')
         else:
-            xy = []
+            xy, speeds = [], None
             self.get_logger().warn('No reference line (no track): publishing an empty trajectory')
-        self.pub = self.create_publisher(Path, 'planning/trajectory', LATCHED)
-        self.pub.publish(path_msg(xy, self.get_clock().now().to_msg()))
+        stamp = self.get_clock().now().to_msg()
+        self.trajectory_pub = self.create_publisher(Trajectory, 'planning/trajectory', LATCHED)
+        self.path_pub = self.create_publisher(Path, 'planning/trajectory/path', LATCHED)
+        self.trajectory_pub.publish(trajectory_msg(xy, speeds, stamp))
+        self.path_pub.publish(path_msg(xy, stamp))
 
 
 def main(args=None):
