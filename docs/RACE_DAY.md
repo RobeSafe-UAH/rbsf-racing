@@ -1,8 +1,8 @@
 # Race day protocol
 
 From an unknown track to a reference line the stack can use: map the track autonomously,
-inspect the two maps, and build the centerline from the better one. This covers only what is
-implemented today. Racing on the generated track is not (see the end).
+inspect the two maps, build the centerline from the better one, and follow it on the car. This
+covers only what is implemented today (see the end for what is missing).
 
 > **The real car has not run this stack yet.** Everything below is verified in MVSim and
 > f1tenth_gym. On the car, do the first-run checks of step 1 before anything else, and expect to
@@ -16,6 +16,7 @@ implemented today. Racing on the generated track is not (see the end).
 | 3. Inspection | laptop | `inspection.png`, `inspection.yaml`, recommended map |
 | 4. Centerline generation | laptop | `maps/<stamp>/track/` |
 | 5. Check the track in simulation | laptop | the track drives |
+| 6. Centerline tracking on the car | car + laptop | the car laps the track |
 
 ## 0. Prepare (the day before)
 
@@ -195,22 +196,44 @@ MVSim builds its world from the cleaned map, and Pure Pursuit follows the center
 must lap without touching a wall (`/r0/collision` stays false). In the iros2026 rehearsal the
 generated track ran 129 m in 70 s without a collision.
 
-**This is simulation only.** `raceline_tracking` refuses `platform:=real`: the car needs to be
-localized on the track's map first (below).
+To also check the car's localization chain (known map + particle filter instead of ground truth),
+add `mapping:=map_server localization:=particle_filter`.
+
+## 6. Centerline tracking on the car *(untested on the car)*
+
+On the car the behaviour localizes on the track's map: `map_server` publishes the cleaned map on
+`/map`, and the particle filter (RF2O odometry + LiDAR) owns `map -> r0/odom`. Same
+`ROS_DOMAIN_ID` on both machines.
+
+```bash
+# Car
+ros2 launch stack_launcher platform.launch.py platform:=real
+
+# Laptop (e.g. the eps track mapped on 2026-10-22)
+ros2 launch stack_launcher raceline_tracking.launch.py platform:=real deployment:=distributed \
+    line:=centerline track:=/ros2_ws/maps/20261022_094722/track/eps_261022.yaml
+```
+
+1. Put the car at the start of the centerline (the red dot in `centerline.png`), pointing in the
+   driving direction: the particle filter starts there. If it starts elsewhere, pass
+   `initial_pose:=x,y,yaw` or re-seed it with RViz's 2D Pose Estimate.
+2. Check the localization before moving: in RViz (`rviz_slam`) or Foxglove the scan must overlay
+   the map's walls. Push the car a metre by hand: the particles must follow it.
+3. Arm (START), then hold RB. Release = stop, LB = take over.
+
+Pure Pursuit drives with its curvature-based speed profile; the top speed is in
+`src/controller/rbsf_path_tracking/config/pure_pursuit_real.yaml` (`speed:=<m/s>` overrides it,
+never below 0.8 m/s on the car). `controller:=map` switches to MAP.
 
 ## Not implemented yet
 
-Stop here on race day. These pieces are still missing before the car can race the generated
-track:
+These pieces are still missing before the car can race the generated track:
 
-- **Known-map mapping and localization on the car**: mapping slot `map_server` (the track's
-  map) and a particle-filter localization slot that owns `map -> r0/odom`.
 - **Planning**: a raceline optimised from the centerline, with its own speed profile (the
   identity planning publishes the centerline as is, and the controllers drive it with their
   curvature-based speed profile).
-- **`raceline_tracking` on `platform:=real`**: the behaviour and both controllers
-  (`pure_pursuit`, `map`) exist and are verified in MVSim, but are refused on the car until the
-  two slots above exist.
+- **Real-car validation** of step 6: the particle filter and both controllers are verified in
+  MVSim only.
 
 ## Troubleshooting
 
