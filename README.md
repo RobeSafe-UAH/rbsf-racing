@@ -237,15 +237,24 @@ ros2 launch stack_launcher raceline_tracking.launch.py track:=/ros2_ws/maps/<sta
 ### Raceline tracking
 
 The car follows the track's reference line (legacy `03_centerline_tracking`). The identity
-planning publishes it on `/r0/planning/trajectory` (`nav_msgs/Path`, the raceline if the track
-has one, else the centerline), and the controller tracks it from `/r0/localization/odom` into
-`drive_gate`. Simulators only for now: on the car the pose must be localized on the track's map
-(`map_server` + particle filter, not implemented), so `platform:=real` is refused.
+planning publishes it on `/r0/planning/trajectory` (`rbsf_msgs/Trajectory`, the raceline if the
+track has one, else the centerline; also as `nav_msgs/Path` on `planning/trajectory/path`), and
+the controller tracks it from `/r0/localization/odom` into `drive_gate`. On the simulators the
+pose is ground truth. On the car it is localized on the track's known map: `map_server` publishes
+the map and the particle filter (RF2O odometry + LiDAR) owns `map -> r0/odom`, so `track:=` is
+required there. Step by step on the car: [`docs/RACE_DAY.md`](docs/RACE_DAY.md).
 
 ```bash
 ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026                   # Pure Pursuit
 ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026 controller:=map   # MAP
-#   platform:=mvsim|f1tenth  speed:=<m/s>  line:=auto|raceline|centerline  params_file:=<yaml>
+# The car's localization chain in simulation (known map + particle filter)
+ros2 launch stack_launcher raceline_tracking.launch.py track:=eps_circuit \
+    mapping:=map_server localization:=particle_filter
+# On the car (laptop side; the car runs platform.launch.py platform:=real)
+ros2 launch stack_launcher raceline_tracking.launch.py platform:=real deployment:=distributed \
+    track:=/ros2_ws/maps/<stamp>/track/<name>.yaml
+#   platform:=real|mvsim|f1tenth  speed:=<m/s>  line:=auto|raceline|centerline  params_file:=<yaml>
+#   initial_pose:=x,y,yaw|global (particle filter start; default the reference line's start)
 ```
 
 `rviz_slam` (in the container) opens the stack's RViz view. It shows the reference line coloured
