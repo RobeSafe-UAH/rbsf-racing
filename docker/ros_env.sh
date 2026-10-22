@@ -26,8 +26,9 @@ cb() {
   (cd "$RBSF_WS" && colcon build "$@") && source "$RBSF_WS/install/local_setup.bash"
 }
 
-# RViz with both DualSLAM maps (SLAM Toolbox on /map, Cartographer overlay), the scan and the
-# car model of r0, plus the plot_speed web plot of r0. The simulators publish the car model; on
+# The stack's single RViz view of r0 (stack_launcher config/rviz/stack.rviz, every behaviour:
+# maps, reference line, lookahead target, driven path, scan, particles, car model), plus the
+# plot_speed web plot of r0. The simulators publish the car model; on
 # the real car nobody does, so it starts stack_launcher's robot_model.launch.py here. Everything
 # it starts stops with RViz.
 rviz_slam() {
@@ -43,7 +44,7 @@ rviz_slam() {
     ros2 launch stack_launcher robot_model.launch.py robot:=r0 >/dev/null 2>&1 &
     model=$!
   fi
-  rviz2 -d "$(ros2 pkg prefix rbsf_dual_slam)/share/rbsf_dual_slam/config/rviz/dual_slam.rviz" "$@"
+  rviz2 -d "$(ros2 pkg prefix stack_launcher)/share/stack_launcher/config/rviz/stack.rviz" "$@"
   # $plot is the subshell running plot_speed; web_plot is its child. SIGINT is ignored by
   # background jobs in shells without job control, hence the SIGKILL fallback.
   if [ -n "$plot" ]; then

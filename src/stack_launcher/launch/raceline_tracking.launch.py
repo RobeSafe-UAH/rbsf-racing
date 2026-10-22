@@ -21,27 +21,23 @@ Quick start:
     ros2 launch stack_launcher raceline_tracking.launch.py platform:=f1tenth track:=spielberg
     # The real car's chain in simulation: known map + particle filter instead of ground truth.
     ros2 launch stack_launcher raceline_tracking.launch.py track:=eps_circuit \
-        mapping:=map_server localization:=particle_filter rviz:=true
+        mapping:=map_server localization:=particle_filter
     # On the car (track:= is required: a track name or maps/<stamp>/track/<name>.yaml).
     ros2 launch stack_launcher raceline_tracking.launch.py platform:=real \
         deployment:=distributed track:=eps_circuit
 Options: speed:=<m/s> (top speed of the profile), params_file:=<controller yaml>, line:=centerline,
 initial_pose:=x,y,yaw|global (particle filter start; default the reference line's start, where the
-car is placed; RViz's 2D Pose Estimate re-seeds it),
-rviz:=true (RViz framing the track: reference line, lookahead target, driven path, car, scan and
-the particles).
+car is placed; RViz's 2D Pose Estimate re-seeds it).
+View it with rviz_slam (docker/ros_env.sh): reference line, lookahead target, driven path, car,
+scan and the particles.
 """
 
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
 from launch.substitutions import LaunchConfiguration
-from rbsf_path_tracking.launch_common import NODE_NAMES
-from rbsf_worlds.paths import load_waypoints
-from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml
 from stack_launcher.compose import include, include_slots
 from stack_launcher.registry import (
     DEPLOYMENTS, IMPLEMENTATIONS, PLATFORMS, resolve_track, SLOTS, USE_SIM_TIME, validate)
-from stack_launcher.rviz import rviz_node
 
 DEFAULT_SLOTS = {
     'mapping': 'identity',
@@ -82,13 +78,6 @@ def launch_setup(context):
              'localization': {'initial_pose': arg('initial_pose')},
              'controller': {'speed': arg('speed'), 'params_file': arg('params_file')}}
     actions += include_slots(slots, robot, platform, track, USE_SIM_TIME[platform], extra)
-    if arg('rviz').lower() == 'true':
-        # Our own view replaces the simulator's (f1tenth): it shows what the tracker follows.
-        xy, _ = load_waypoints(find_waypoints(resolve_map_yaml(track), arg('line')))
-        node = NODE_NAMES.get(slots['controller'], slots['controller'])
-        actions.append(rviz_node(
-            'raceline_tracking.rviz', robot, {'/pure_pursuit/target': f'/{node}/target'}, xy,
-            USE_SIM_TIME[platform]))
     return actions
 
 
@@ -131,9 +120,6 @@ def generate_launch_description():
             description='Controller parameter YAML. Default: its _sim/_real config.'),
         DeclareLaunchArgument(
             'headless', default_value='false', description='MVSim without its window.'),
-        DeclareLaunchArgument(
-            'rviz', default_value='false',
-            description='RViz with the reference line, lookahead target and driven path.'),
         DeclareLaunchArgument(
             'foxglove', default_value='true', description='Foxglove bridge (simulators).'),
         DeclareLaunchArgument(

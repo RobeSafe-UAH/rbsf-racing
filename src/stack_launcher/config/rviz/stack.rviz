@@ -1,5 +1,7 @@
-# raceline_tracking view of /r0. raceline_tracking.launch.py (rviz:=true) rewrites /r0/ to the
-# robot's namespace and /r0/pure_pursuit/ to the controller node's namespace.
+# The stack's single RViz view of /r0, for every behaviour, opened by rviz_slam (docker/ros_env.sh):
+# /map (primary SLAM or map_server), SLAM Toolbox's map (off by default), reference line,
+# lookahead target of either controller, driven path, car, scan and particles. Displays without a
+# publisher stay empty.
 Panels:
   - Class: rviz_common/Displays
     Name: Displays
@@ -25,6 +27,20 @@ Visualization Manager:
         Value: /map
       Use Timestamp: false
       Value: true
+    - Alpha: 0.7
+      Class: rviz_default_plugins/Map
+      Color Scheme: map
+      Draw Behind: true
+      Enabled: false
+      Name: SLAM Toolbox map
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/mapping/slam_toolbox/map
+      Use Timestamp: false
+      Value: false
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
@@ -86,7 +102,7 @@ Visualization Manager:
       Color: 255; 40; 40
       Enabled: true
       History Length: 1
-      Name: Lookahead target
+      Name: Lookahead target (Pure Pursuit)
       Radius: 0.15
       Topic:
         Depth: 5
@@ -94,6 +110,20 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /r0/pure_pursuit/target
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/PointStamped
+      Color: 255; 40; 40
+      Enabled: true
+      History Length: 1
+      Name: Lookahead target (MAP)
+      Radius: 0.15
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/map_controller/target
       Value: true
     - Alpha: 1
       Class: rviz_default_plugins/RobotModel

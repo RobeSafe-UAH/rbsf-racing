@@ -248,8 +248,8 @@ ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026 controlle
 #   platform:=mvsim|f1tenth  speed:=<m/s>  line:=auto|raceline|centerline  params_file:=<yaml>
 ```
 
-`rviz:=true` opens RViz framed on the track. It shows the reference line, the lookahead target, the
-path driven so far, the car and its scan.
+`rviz_slam` (in the container) opens the stack's RViz view. It shows the reference line, the
+lookahead target, the path driven so far, the car, its scan and the particle filter's particles.
 
 Both controllers are one node, `rbsf_path_tracking`'s `path_tracker`, with the same topics and
 parameters and a different `steering_law`. Each aims at the waypoint a lookahead
