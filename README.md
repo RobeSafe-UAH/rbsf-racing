@@ -282,7 +282,7 @@ lookahead (0.9 + 0.2 v) to take the hairpin's S-bend, 4.65 s laps in MVSim; `iro
 ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real
 # Distributed: same ROS_DOMAIN_ID on both machines (make run ROS_DOMAIN_ID=<n>)
 ros2 launch stack_launcher platform.launch.py platform:=real require_deadman:=true                  # car
-ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed  # laptop
+ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real deployment:=distributed controller:=follow_the_gap # laptop
 ```
 
 `rbsf_bringup` starts the VESC (`/dev/sensors/vesc`), the Hokuyo (Ethernet, 192.168.0.10), RF2O
