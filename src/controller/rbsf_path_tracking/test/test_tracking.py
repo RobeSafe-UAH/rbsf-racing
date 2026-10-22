@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from rbsf_path_tracking.tracking import (
     arc_curvature, lookahead_distance, lookahead_index, map_steering, nearest_index,
-    steering_angle)
+    speed_colors, steering_angle)
 
 
 def circle(radius=5.0, n=200):
@@ -61,3 +61,8 @@ def test_map_adds_understeer_proportional_to_lateral_acceleration():
 def test_unknown_law_is_rejected():
     with pytest.raises(ValueError, match='Valid options'):
         steering_angle('stanley', 0.0, 0.0, 0.0, (1.0, 0.0), 1.0, 0.33, 0.4)
+
+
+def test_speed_colors_scale_from_red_to_green():
+    colors = speed_colors([0.5, 1.0, 2.0, 3.0, 4.0], slow=1.0, fast=3.0)
+    np.testing.assert_allclose(colors, [[1, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 1, 0]])

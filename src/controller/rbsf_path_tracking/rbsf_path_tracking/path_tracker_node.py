@@ -21,8 +21,9 @@ Algorithm, at `rate` Hz once a trajectory and fresh odometry (< odom_timeout s o
 (and, if `start_at` is set, once that wall-clock time has passed, so several cars can set off
 together). Without them it publishes nothing, and drive_gate stops the car:
     0. On a new trajectory or new profile parameters, compute the speed profile
-       (speed_profile.py): the curvature limit sqrt(max_lateral_acceleration / |k|), clipped by the
-       planner's target speeds and [min_speed, speed], then acceleration and braking passes.
+       (rbsf_worlds/speed_profile.py): the curvature limit sqrt(max_lateral_acceleration / |k|),
+       clipped by the planner's target speeds and [min_speed, speed], then acceleration and
+       braking passes.
     1. Find the waypoint nearest to the car.
     2. Speed: the profile at the waypoint `speed_preview` seconds ahead at the measured speed
        (covers the drivetrain's lag when braking into a corner).
@@ -41,9 +42,10 @@ from geometry_msgs.msg import Point, PointStamped
 from nav_msgs.msg import Odometry
 import numpy as np
 from rbsf_msgs.msg import Trajectory, Waypoint
-from rbsf_path_tracking.speed_profile import speed_colors, speed_profile
 from rbsf_path_tracking.tracking import (
-    lookahead_distance, lookahead_index, nearest_index, steering_angle, STEERING_LAWS)
+    lookahead_distance, lookahead_index, nearest_index, speed_colors, steering_angle,
+    STEERING_LAWS)
+from rbsf_worlds.speed_profile import speed_profile
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node

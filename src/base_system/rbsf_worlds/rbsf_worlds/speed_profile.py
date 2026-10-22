@@ -1,6 +1,9 @@
 """
 Curvature-based speed profile on a closed waypoint path (no ROS dependencies).
 
+Shared by the path tracker (rbsf_path_tracking, online, under the planner's target speeds) and
+the offline raceline tool (raceline.py, which writes it into the raceline's vx column).
+
 The speed at each waypoint is the fastest the car can take it, under three limits:
 
 1. Lateral grip: v = sqrt(max_lateral_acceleration / |k|), with k the path curvature there.
@@ -34,14 +37,19 @@ def points_at(xy, s):
                             np.interp(s, cumulative, loop[:, 1])))
 
 
-def curvature(xy, spacing):
-    """Return |k| (1/m) at each waypoint, from the points `spacing` m before and after it."""
+def curvature(xy, spacing, signed=False):
+    """
+    Return |k| (1/m) at each waypoint, from the points `spacing` m before and after it.
+
+    With `signed`, k itself: positive where the path turns left.
+    """
     s = np.concatenate(([0.0], np.cumsum(segment_lengths(xy)[:-1])))
     a, b, c = points_at(xy, s - spacing), xy, points_at(xy, s + spacing)
     ab, bc, ac = b - a, c - b, c - a
     cross = ab[:, 0] * ac[:, 1] - ab[:, 1] * ac[:, 0]
     sides = np.linalg.norm(ab, axis=1) * np.linalg.norm(bc, axis=1) * np.linalg.norm(ac, axis=1)
-    return np.divide(2.0 * np.abs(cross), sides, out=np.zeros(len(xy)), where=sides > 1e-12)
+    cross = cross if signed else np.abs(cross)
+    return np.divide(2.0 * cross, sides, out=np.zeros(len(xy)), where=sides > 1e-12)
 
 
 def speed_profile(xy, max_speed, min_speed, max_lateral_acceleration, max_acceleration,
@@ -63,10 +71,3 @@ def speed_profile(xy, max_speed, min_speed, max_lateral_acceleration, max_accele
         i, j = step % n, (step + 1) % n
         v[i] = min(v[i], math.sqrt(v[j] ** 2 + 2.0 * max_deceleration * d[i]))
     return v
-
-
-def speed_colors(speeds, slow, fast):
-    """Return an RGB row in [0, 1] per speed: red <= `slow`, yellow halfway, green >= `fast`."""
-    t = np.clip((np.asarray(speeds, dtype=float) - slow) / (fast - slow), 0.0, 1.0)
-    return np.column_stack((np.minimum(1.0, 2.0 * (1.0 - t)), np.minimum(1.0, 2.0 * t),
-                            np.zeros_like(t)))
