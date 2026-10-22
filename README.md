@@ -248,8 +248,11 @@ ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026 controlle
 #   platform:=mvsim|f1tenth  speed:=<m/s>  line:=auto|raceline|centerline  params_file:=<yaml>
 ```
 
-`rviz_slam` (in the container) opens the stack's RViz view. It shows the reference line, the
-lookahead target, the path driven so far, the car, its scan and the particle filter's particles.
+`rviz_slam` (in the container) opens the stack's RViz view. It shows the reference line coloured
+by the controller's speed profile (`<controller>/speed_profile`: red at `speed_color_min`, 1.0 m/s,
+to green at `speed_color_max`, 3.0 m/s), the lookahead target, the path driven so far, the car,
+its scan and the particle filter's particles. The plain `planning/trajectory/path` display is
+off by default.
 
 Both controllers are one node, `rbsf_path_tracking`'s `path_tracker`, with the same topics and
 parameters and a different `steering_law`. Each aims at the waypoint a lookahead

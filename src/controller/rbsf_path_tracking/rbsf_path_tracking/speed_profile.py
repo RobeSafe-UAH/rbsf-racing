@@ -63,3 +63,10 @@ def speed_profile(xy, max_speed, min_speed, max_lateral_acceleration, max_accele
         i, j = step % n, (step + 1) % n
         v[i] = min(v[i], math.sqrt(v[j] ** 2 + 2.0 * max_deceleration * d[i]))
     return v
+
+
+def speed_colors(speeds, slow, fast):
+    """Return an RGB row in [0, 1] per speed: red <= `slow`, yellow halfway, green >= `fast`."""
+    t = np.clip((np.asarray(speeds, dtype=float) - slow) / (fast - slow), 0.0, 1.0)
+    return np.column_stack((np.minimum(1.0, 2.0 * (1.0 - t)), np.minimum(1.0, 2.0 * t),
+                            np.zeros_like(t)))

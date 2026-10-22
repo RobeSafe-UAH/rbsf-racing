@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 import pytest
-from rbsf_path_tracking.speed_profile import curvature, speed_profile
+from rbsf_path_tracking.speed_profile import curvature, speed_colors, speed_profile
 
 
 def circle(radius, n=200):
@@ -84,3 +84,8 @@ def test_min_speed_floors_tight_corners():
 
 def test_max_speed_wins_over_a_higher_min_speed():
     assert profile(circle(0.1), min_speed=0.8, max_speed=0.5) == pytest.approx(0.5)
+
+
+def test_speed_colors_scale_from_red_to_green():
+    colors = speed_colors([0.5, 1.0, 2.0, 3.0, 4.0], slow=1.0, fast=3.0)
+    np.testing.assert_allclose(colors, [[1, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 1, 0]])

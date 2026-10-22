@@ -45,7 +45,7 @@ Visualization Manager:
       Buffer Length: 1
       Class: rviz_default_plugins/Path
       Color: 0; 200; 255
-      Enabled: true
+      Enabled: false
       Head Diameter: 0.3
       Head Length: 0.2
       Length: 0.3
@@ -67,6 +67,30 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /r0/planning/trajectory/path
+      Value: false
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Speed profile (Pure Pursuit)
+      Namespaces:
+        speed_profile: true
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/pure_pursuit/speed_profile
+      Value: true
+    - Class: rviz_default_plugins/Marker
+      Enabled: true
+      Name: Speed profile (MAP)
+      Namespaces:
+        speed_profile: true
+      Topic:
+        Depth: 1
+        Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /r0/map_controller/speed_profile
       Value: true
     - Angle Tolerance: 3.14
       Class: rviz_default_plugins/Odometry
