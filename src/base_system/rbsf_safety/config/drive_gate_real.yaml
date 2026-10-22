@@ -19,7 +19,7 @@
     steering_axis: 3
     # Limits (m/s, rad). Every command is clipped to them, manual and autonomous.
     max_manual_speed: 2.0
-    max_auto_speed: 2.0
+    max_auto_speed: 3.0
     max_steering: 0.4189
 
 /**/joy_node:
