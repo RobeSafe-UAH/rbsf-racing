@@ -65,6 +65,12 @@ to the mapping slot (a SLAM, or the identity when there is none).
 
 See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sources.
 
+A track gets a raceline from its centerline with `scripts/tracks/raceline.py <track | map yaml>`
+(in the dev container): a minimum-curvature line inside the walls, checked by sweeping the car's
+footprint along it (clearance to the walls and the steering limit), with the curvature-based
+speed profile in its `vx` column. It writes `<name>_raceline.csv` next to the yaml only if the
+line passes; `line:=auto` then drives it. Details in the tracks README.
+
 ## Apps
 
 The stack is split into five interchangeable functional slots (mapping, localization,
@@ -180,6 +186,8 @@ ros2 launch stack_launcher raceline_tracking.launch.py track:=/ros2_ws/maps/<sta
   recorded trajectory, and `--ccw/--cw` and `--start X Y` override them. Coordinates are in the
   source map's frame, so the result is a self-contained track for both simulators and the planners.
 - The algorithm (`rbsf_worlds/centerline.py`) is shared with `scripts/tracks/drawn_track.py`.
+- Optional: `python3 scripts/tracks/raceline.py maps/<stamp>/track/<name>.yaml` adds a checked
+  minimum-curvature raceline next to it (see Tracks above).
 
 - The wall follower (`follow_side: left` by default, the inner boundary of a counter-clockwise
   lap; `right` for clockwise, `centre` to centre between both walls) picks a mode on every scan.
@@ -275,7 +283,7 @@ parameters and a different `steering_law`. Each aims at the waypoint a lookahead
   single-track model, `delta = atan(wheelbase * k) + understeer_gradient * a`. The extra term
   steers more as the tyres slip in fast corners. With `understeer_gradient: 0` it is Pure Pursuit.
 
-Both laws drive a curvature-based speed profile (`speed_profile.py`): the corner speed
+Both laws drive a curvature-based speed profile (`rbsf_worlds/speed_profile.py`): the corner speed
 `sqrt(max_lateral_acceleration / |k|)`, capped by `speed` (the top speed) and the planner's target
 speeds (`rbsf_msgs/Trajectory`; the raceline's, none on a centerline), floored by `min_speed`,
 then limited by `max_acceleration` / `max_deceleration` so the car brakes before corners. The
