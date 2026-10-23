@@ -22,15 +22,12 @@ under it (`rbsf_mvsim/bridges.py`). The cones stop only cars at ground level, wh
 are not `cones:` (those are walls in the map, at every height). f1tenth_gym has no 3D and drives
 the bridge as a flat crossing, without the cones under it.
 
-| Track | Length | Lines | Source |
-|---|---|---|---|
-| `levine` | 61.8 m (centerline) | centerline | f1tenth_gym_ros `maps/levine*` |
-| `spielberg` | 343.3 m (centerline), 338.1 m (raceline) | centerline, raceline | f1tenth_gym_ros `maps/Spielberg*` |
-| `iros2026` | 209.4 m (centerline) | centerline | IROS 2026 RoboRacer competition map |
-| `icra2026_classic` | 80.8 m (centerline) | centerline | ICRA 2026 RoboRacer Classic Cup map |
-| `icra2026_master` | 152.5 m (centerline) | centerline | ICRA 2026 RoboRacer Master Cup map |
-| `icra2025` | 101.8 m (centerline) | centerline | ICRA 2025 RoboRacer competition map (AuRoRus `maps/Atlanta_2025`) |
-| `eps_circuit` | 21.1 m (centerline) | centerline | Mapped by the real car (session `20261021_122444`, Cartographer) |
+[`docs/MAP_CATALOG.md`](../../../../docs/MAP_CATALOG.md) lists every track with a preview, its
+lengths, widths and driving direction. It is generated from these files: after adding or
+regenerating a track, add its source to `scripts/tracks/catalog.py` and rerun it (dev container,
+workspace sourced):
+
+    python3 scripts/tracks/catalog.py
 
 `levine` and `spielberg` come from [f1tenth/f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros) (branch
 `dev-jazzy`, commit `f9ad174`), MIT License, Copyright (c) 2020 Hongrui Zheng. Spielberg files

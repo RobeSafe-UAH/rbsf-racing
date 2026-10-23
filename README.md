@@ -55,15 +55,9 @@ to the mapping slot (a SLAM, or the identity when there is none).
 `src/base_system/rbsf_worlds` holds the tracks every simulator (and later the car) uses: a ROS map
 (yaml + image) plus the reference lines to drive on. Both simulators take `track:=<name>`.
 
-| Track | Length (centerline) | Lines |
-|---|---|---|
-| `levine` | 61.8 m | centerline |
-| `spielberg` | 343.3 m | centerline, raceline (338.1 m, with speed profile) |
-| `iros2026` | 209.4 m | centerline |
-| `icra2026_classic` | 80.8 m | centerline |
-| `icra2026_master` | 152.5 m | centerline (over the 0.7 m bridge; 3D in MVSim only) |
-
-See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sources.
+[`docs/MAP_CATALOG.md`](docs/MAP_CATALOG.md) lists them all with a preview: the ICRA 2025 and
+2026 and IROS 2026 competition maps, two tracks mapped by our car, and f1tenth_gym's `levine` and
+`spielberg`. See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sources.
 
 ## Apps
 
