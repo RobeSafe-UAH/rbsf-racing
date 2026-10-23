@@ -1,4 +1,5 @@
 import numpy as np
+from rbsf_worlds.centerline import signed_area
 from rbsf_worlds.paths import arc_lengths, load_waypoints
 from rbsf_worlds.tracks import find_waypoints, resolve_map_yaml, track_names, track_yaml
 import yaml
@@ -54,3 +55,23 @@ def test_icra2026_centerlines_are_closed_loops_inside_the_corridor():
         assert gaps.max() < 0.15
         widths = np.loadtxt(path, delimiter=',', comments='#')[:, 2:]
         assert widths.min() > 0.5
+
+
+def test_icra2025_centerline_starts_on_the_aurorus_line_and_runs_clockwise():
+    path = find_waypoints(track_yaml('icra2025'))
+    assert path.name == 'icra2025_centerline.csv'
+    xy, _ = load_waypoints(path)
+    _, total = arc_lengths(xy)
+    assert abs(total - 101.8) < 1.0
+    gaps = np.linalg.norm(np.diff(xy, axis=0, append=xy[:1]), axis=1)
+    assert gaps.max() < 0.15
+    widths = np.loadtxt(path, delimiter=',', comments='#')[:, 2:]
+    assert widths.min() > 0.4
+    assert signed_area(xy) < 0
+    # AuRoRus start/finish line a-b, y negated (their frame is y-down): starts at its midpoint,
+    # heading along (b - a) turned a quarter clockwise in ROS coordinates.
+    a, b = np.array([4.2766, 2.5899]), np.array([5.6690, 1.9424])
+    assert np.linalg.norm(xy[0] - (a + b) / 2) < 0.15
+    heading = np.array([(b - a)[1], -(b - a)[0]]) / np.linalg.norm(b - a)
+    step = xy[3] - xy[0]
+    assert step @ heading / np.linalg.norm(step) > 0.95

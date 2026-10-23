@@ -29,6 +29,7 @@ the bridge as a flat crossing, without the cones under it.
 | `iros2026` | 209.4 m (centerline) | centerline | IROS 2026 RoboRacer competition map |
 | `icra2026_classic` | 80.8 m (centerline) | centerline | ICRA 2026 RoboRacer Classic Cup map |
 | `icra2026_master` | 152.5 m (centerline) | centerline | ICRA 2026 RoboRacer Master Cup map |
+| `icra2025` | 101.8 m (centerline) | centerline | ICRA 2025 RoboRacer competition map (AuRoRus `maps/Atlanta_2025`) |
 | `eps_circuit` | 21.1 m (centerline) | centerline | Mapped by the real car (session `20261021_122444`, Cartographer) |
 
 `levine` and `spielberg` come from [f1tenth/f1tenth_gym_ros](https://github.com/f1tenth/f1tenth_gym_ros) (branch
@@ -89,6 +90,21 @@ from the junction with the cheapest centred path over the bridge:
         --leave 15.93 2.88 --rejoin -1.45 10.48 --close-gaps 0.4 \
         --block 16.31 7.63 18.78 7.63 --block 0.92 10.48 3.39 10.48 \
         --block 4.82 6.86 8.43 6.86 --block 4.82 5.72 8.43 5.72
+
+`icra2025` is the ICRA 2025 competition map (Atlanta), from
+[Noce99/AuRoRus](https://github.com/Noce99/AuRoRus) `maps/Atlanta_2025` (commit `5175016`),
+MIT or Apache-2.0 at your option, Copyright (c) 2026 Enrico Mannocci. Their map is a bi-level
+TIFF already filled like a SLAM map (corridor white, everything else black), kept losslessly as
+`icra2025_original.{png,yaml}`. Their `info.json` uses a y-down frame anchored at the top-left
+pixel corner, so the ROS origin is the bottom-left corner (`[-9.15, -12.85]`, the same numbers
+since the map is centred) and their y coordinates change sign. The start is the midpoint of
+their start/finish line, driven the way their `start_pose()` heads (in ROS coordinates `b` is on
+the left; their own docs say `a`, in the mirrored frame): clockwise. The corridor is 0.9-2.4 m
+wide:
+
+    python3 scripts/tracks/drawn_track.py \
+        src/base_system/rbsf_worlds/tracks/icra2025/icra2025_original.yaml \
+        --name icra2025 --start 4.973 2.266 --cw
 
 `eps_circuit` is the exception to the rule below: a car-mapped track kept so both simulators
 can drive it by name. It is `session_track.py centerline --source cartographer` output, copied
