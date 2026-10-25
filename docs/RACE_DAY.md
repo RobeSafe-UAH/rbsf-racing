@@ -229,9 +229,10 @@ never below 0.8 m/s on the car). `controller:=map` switches to MAP.
 
 These pieces are still missing before the car can race the generated track:
 
-- **Planning**: a raceline optimised from the centerline, with its own speed profile (the
-  identity planning publishes the centerline as is, and the controllers drive it with their
-  curvature-based speed profile).
+- **Raceline on the car**: `scripts/tracks/raceline.py maps/<stamp>/track/<name>.yaml` builds a
+  checked minimum-curvature raceline for the mapped track (see the tracks README), and
+  `line:=raceline` drives it. It is verified in MVSim only. Measure the car first (chassis
+  overhangs and width at the wheels) and pass them as `--rear --front --width`.
 - **Real-car validation** of step 6: the particle filter and both controllers are verified in
   MVSim only.
 

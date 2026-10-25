@@ -71,3 +71,10 @@ def steering_angle(law, x, y, yaw, target, speed, wheelbase, max_steering,
         raise ValueError(
             f"Unknown steering law '{law}'. Valid options: {', '.join(STEERING_LAWS)}")
     return max(-max_steering, min(max_steering, angle))
+
+
+def speed_colors(speeds, slow, fast):
+    """Return an RGB row in [0, 1] per speed: red <= `slow`, yellow halfway, green >= `fast`."""
+    t = np.clip((np.asarray(speeds, dtype=float) - slow) / (fast - slow), 0.0, 1.0)
+    return np.column_stack((np.minimum(1.0, 2.0 * (1.0 - t)), np.minimum(1.0, 2.0 * t),
+                            np.zeros_like(t)))

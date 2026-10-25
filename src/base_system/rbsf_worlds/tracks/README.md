@@ -4,7 +4,9 @@ One directory per track: `<name>/<name>.yaml` + image (ROS map_server format) an
 lines the stack drives on, in the f1tenth_gym CSV formats:
 
 - `<name>_centerline.csv`: `x_m, y_m, w_tr_right_m, w_tr_left_m`
-- `<name>_raceline.csv`: `s_m; x_m; y_m; psi_rad; kappa_radpm; vx_mps; ax_mps2`
+- `<name>_raceline.csv`: `s_m; x_m; y_m; psi_rad; kappa_radpm; vx_mps; ax_mps2` (`psi` is the
+  ROS yaw in racelines from `scripts/tracks/raceline.py`; spielberg's is TUM's convention, unused
+  by the stack, which reads only x, y and vx)
 
 A yaml may instead name its centerline with a `centerline:` key (path relative to the yaml).
 
@@ -106,6 +108,53 @@ wide:
 `eps_circuit` is the exception to the rule below: a car-mapped track kept so both simulators
 can drive it by name. It is `session_track.py centerline --source cartographer` output, copied
 from `maps/20261021_122444/track/`; the corridor is 1.0-1.9 m wide, driven counter-clockwise.
+
+## Racelines
+
+`scripts/tracks/raceline.py` optimises a raceline for lap time from a track's centerline and
+checks that the car fits along it (algorithm in `rbsf_worlds/raceline.py`, no ROS):
+
+    python3 scripts/tracks/raceline.py eps_circuit                        # built-in track
+    python3 scripts/tracks/raceline.py maps/<stamp>/track/<name>.yaml     # car-mapped track
+    python3 scripts/tracks/raceline.py spielberg --check-only \
+        src/base_system/rbsf_worlds/tracks/spielberg/spielberg_raceline.csv   # check a line
+
+- The walls come from the map image (plus the yaml's `cones:`), not from the CSV widths. The
+  line moves each centerline point along its normal, keeping half the car's width plus
+  `--margin` (0.15 m) from both walls, and minimises the lap's sum of squared curvature plus
+  w times its length, with a penalty above the steering limit `tan(--max-steering) /
+  --wheelbase` (R 0.74 m on the car). It tries each `--length-weights` value (0 = minimum
+  curvature ... 10 = close to the shortest path) and keeps the line with the shortest lap time
+  under the speed profile that passes the check.
+- The check sweeps the footprint (`--rear` / `--front` of the rear axle, `--width`; default the
+  real chassis, 0.05 / 0.43 / 0.31 m) along the line every 2 cm. Every pose must keep `--margin`
+  from the walls and the curvature must stay under the steering limit. Stretches that come too
+  close are pushed off that wall and the line is optimised again.
+- `vx` is the controllers' curvature-based speed profile with the real car's limits by default
+  (`--speed 3.0 --lateral 3.0 ...`); the tracker drives under it and its own profile. `--speed`
+  is capped at 3.0 m/s, the car's `max_auto_speed` in `drive_gate_real.yaml`.
+- `<name>_raceline.csv` is written next to the yaml only if both checks pass (`--force` writes
+  it anyway); `raceline.png` shows the line coloured by `vx`, the footprints and any failing poses.
+- Obstacles on the centerline itself are out of scope: widths are measured outwards from it, so
+  a cone on the line makes the tool report that the car does not fit there.
+- The footprint must cover everything that touches the walls. MVSim's body is 0.13 / 0.45 m and
+  the wheels make the car 0.34 m wide: a line planned with the default 0.31 m chassis clipped an
+  apex of eps_circuit about once every 8 laps through the particle filter, and none in 16 laps
+  when planned with `--rear 0.13 --front 0.45 --width 0.34` (measured with an earlier,
+  under-converged version of the optimiser; the lesson holds).
+
+Verified in MVSim (2026-10-22, Pure Pursuit, ground-truth odometry, 3.0 m/s top, real-car corner
+limits), flying laps without collisions:
+
+| Track | Centerline | Minimum curvature (w = 0) | Raceline (fastest w, 1 on both) |
+|---|---|---|---|
+| eps_circuit | 21.06 m, 9.23 s | 20.56 m, 8.17 s | 18.60 m, 7.51 s (-19%) |
+| icra2026_classic | 80.82 m, 30.66 s | 85.05 m, 30.15 s | 71.20 m, 26.35 s (-14%) |
+
+Pure minimum curvature is a poor proxy for lap time under a 3.0 m/s cap: it straightens bends
+taken flat out and makes the lap longer. The predicted lap time (at the speed profile) matched
+MVSim within 1-2%, so the weight sweep can choose on it. Every built-in track passes the check
+with the default footprint.
 
 Tracks mapped by the car itself are not stored here: `scripts/maps/session_track.py` builds them
 inside the mapping session (`maps/<stamp>/track/`, same file formats) from the SLAM map you pick

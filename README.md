@@ -59,6 +59,12 @@ to the mapping slot (a SLAM, or the identity when there is none).
 2026 and IROS 2026 competition maps, two tracks mapped by our car, and f1tenth_gym's `levine` and
 `spielberg`. See `src/base_system/rbsf_worlds/tracks/README.md` for the file formats and sources.
 
+A track gets a raceline from its centerline with `scripts/tracks/raceline.py <track | map yaml>`
+(in the dev container): a minimum-curvature line inside the walls, checked by sweeping the car's
+footprint along it (clearance to the walls and the steering limit), with the curvature-based
+speed profile in its `vx` column. It writes `<name>_raceline.csv` next to the yaml only if the
+line passes; `line:=auto` then drives it. Details in the tracks README.
+
 ## Apps
 
 The stack is split into five interchangeable functional slots (mapping, localization,
@@ -174,6 +180,8 @@ ros2 launch stack_launcher raceline_tracking.launch.py track:=/ros2_ws/maps/<sta
   recorded trajectory, and `--ccw/--cw` and `--start X Y` override them. Coordinates are in the
   source map's frame, so the result is a self-contained track for both simulators and the planners.
 - The algorithm (`rbsf_worlds/centerline.py`) is shared with `scripts/tracks/drawn_track.py`.
+- Optional: `python3 scripts/tracks/raceline.py maps/<stamp>/track/<name>.yaml` adds a checked
+  minimum-curvature raceline next to it (see Tracks above).
 
 - The wall follower (`follow_side: left` by default, the inner boundary of a counter-clockwise
   lap; `right` for clockwise, `centre` to centre between both walls) picks a mode on every scan.
@@ -231,19 +239,31 @@ ros2 launch stack_launcher raceline_tracking.launch.py track:=/ros2_ws/maps/<sta
 ### Raceline tracking
 
 The car follows the track's reference line (legacy `03_centerline_tracking`). The identity
-planning publishes it on `/r0/planning/trajectory` (`nav_msgs/Path`, the raceline if the track
-has one, else the centerline), and the controller tracks it from `/r0/localization/odom` into
-`drive_gate`. Simulators only for now: on the car the pose must be localized on the track's map
-(`map_server` + particle filter, not implemented), so `platform:=real` is refused.
+planning publishes it on `/r0/planning/trajectory` (`rbsf_msgs/Trajectory`, the raceline if the
+track has one, else the centerline; also as `nav_msgs/Path` on `planning/trajectory/path`), and
+the controller tracks it from `/r0/localization/odom` into `drive_gate`. On the simulators the
+pose is ground truth. On the car it is localized on the track's known map: `map_server` publishes
+the map and the particle filter (RF2O odometry + LiDAR) owns `map -> r0/odom`, so `track:=` is
+required there. Step by step on the car: [`docs/RACE_DAY.md`](docs/RACE_DAY.md).
 
 ```bash
 ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026                   # Pure Pursuit
 ros2 launch stack_launcher raceline_tracking.launch.py track:=iros2026 controller:=map   # MAP
-#   platform:=mvsim|f1tenth  speed:=<m/s>  line:=auto|raceline|centerline  params_file:=<yaml>
+# The car's localization chain in simulation (known map + particle filter)
+ros2 launch stack_launcher raceline_tracking.launch.py track:=eps_circuit \
+    mapping:=map_server localization:=particle_filter
+# On the car (laptop side; the car runs platform.launch.py platform:=real)
+ros2 launch stack_launcher raceline_tracking.launch.py platform:=real deployment:=distributed \
+    track:=/ros2_ws/maps/<stamp>/track/<name>.yaml
+#   platform:=real|mvsim|f1tenth  speed:=<m/s>  line:=auto|raceline|centerline  params_file:=<yaml>
+#   initial_pose:=x,y,yaw|global (particle filter start; default the reference line's start)
 ```
 
-`rviz_slam` (in the container) opens the stack's RViz view. It shows the reference line, the
-lookahead target, the path driven so far, the car, its scan and the particle filter's particles.
+`rviz_slam` (in the container) opens the stack's RViz view. It shows the reference line coloured
+by the controller's speed profile (`<controller>/speed_profile`: red at `speed_color_min`, 1.0 m/s,
+to green at `speed_color_max`, 3.0 m/s), the lookahead target, the path driven so far, the car,
+its scan and the particle filter's particles. The plain `planning/trajectory/path` display is
+off by default.
 
 Both controllers are one node, `rbsf_path_tracking`'s `path_tracker`, with the same topics and
 parameters and a different `steering_law`. Each aims at the waypoint a lookahead
@@ -257,7 +277,7 @@ parameters and a different `steering_law`. Each aims at the waypoint a lookahead
   single-track model, `delta = atan(wheelbase * k) + understeer_gradient * a`. The extra term
   steers more as the tyres slip in fast corners. With `understeer_gradient: 0` it is Pure Pursuit.
 
-Both laws drive a curvature-based speed profile (`speed_profile.py`): the corner speed
+Both laws drive a curvature-based speed profile (`rbsf_worlds/speed_profile.py`): the corner speed
 `sqrt(max_lateral_acceleration / |k|)`, capped by `speed` (the top speed) and the planner's target
 speeds (`rbsf_msgs/Trajectory`; the raceline's, none on a centerline), floored by `min_speed`,
 then limited by `max_acceleration` / `max_deceleration` so the car brakes before corners. The

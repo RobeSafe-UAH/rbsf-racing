@@ -13,13 +13,17 @@ Publishes   drive_gate/auto_cmd    ackermann_msgs/AckermannDriveStamped
             ~/target               geometry_msgs/PointStamped (current lookahead point)
             ~/trajectory           rbsf_msgs/Trajectory (the tracked line with the speed profile
                                    it drives, transient local)
+            ~/speed_profile        visualization_msgs/Marker (that line as a closed strip coloured
+                                   by speed, red at speed_color_min to green at speed_color_max,
+                                   for RViz, transient local)
 
 Algorithm, at `rate` Hz once a trajectory and fresh odometry (< odom_timeout s old) have arrived
 (and, if `start_at` is set, once that wall-clock time has passed, so several cars can set off
 together). Without them it publishes nothing, and drive_gate stops the car:
     0. On a new trajectory or new profile parameters, compute the speed profile
-       (speed_profile.py): the curvature limit sqrt(max_lateral_acceleration / |k|), clipped by the
-       planner's target speeds and [min_speed, speed], then acceleration and braking passes.
+       (rbsf_worlds/speed_profile.py): the curvature limit sqrt(max_lateral_acceleration / |k|),
+       clipped by the planner's target speeds and [min_speed, speed], then acceleration and
+       braking passes.
     1. Find the waypoint nearest to the car.
     2. Speed: the profile at the waypoint `speed_preview` seconds ahead at the measured speed
        (covers the drivetrain's lag when braking into a corner).
@@ -34,17 +38,20 @@ together). Without them it publishes nothing, and drive_gate stops the car:
 import time
 
 from ackermann_msgs.msg import AckermannDriveStamped
-from geometry_msgs.msg import PointStamped
+from geometry_msgs.msg import Point, PointStamped
 from nav_msgs.msg import Odometry
 import numpy as np
 from rbsf_msgs.msg import Trajectory, Waypoint
-from rbsf_path_tracking.speed_profile import speed_profile
 from rbsf_path_tracking.tracking import (
-    lookahead_distance, lookahead_index, nearest_index, steering_angle, STEERING_LAWS)
+    lookahead_distance, lookahead_index, nearest_index, speed_colors, steering_angle,
+    STEERING_LAWS)
+from rbsf_worlds.speed_profile import speed_profile
 import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile
+from std_msgs.msg import ColorRGBA
+from visualization_msgs.msg import Marker
 
 PROFILE_PARAMETERS = ('speed', 'min_speed', 'max_lateral_acceleration', 'max_acceleration',
                       'max_deceleration', 'curvature_spacing')
@@ -73,6 +80,9 @@ class PathTrackerNode(Node):
         self.declare_parameter('odom_timeout', 0.5)
         # Wall-clock time (s since the epoch) before which the car stays still; 0 = start now.
         self.declare_parameter('start_at', 0.0)
+        # RViz colour scale of ~/speed_profile (m/s): red at or below min, green at or above max.
+        self.declare_parameter('speed_color_min', 1.0)
+        self.declare_parameter('speed_color_max', 3.0)
 
         self.law = self.get_parameter('steering_law').value
         if self.law not in STEERING_LAWS:
@@ -90,6 +100,7 @@ class PathTrackerNode(Node):
         self.target_pub = self.create_publisher(PointStamped, '~/target', 10)
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.profile_pub = self.create_publisher(Trajectory, '~/trajectory', latched)
+        self.marker_pub = self.create_publisher(Marker, '~/speed_profile', latched)
         self.create_subscription(
             Trajectory, 'planning/trajectory', self.trajectory_callback, latched)
         self.create_subscription(Odometry, 'localization/odom', self.odom_callback, 10)
@@ -135,7 +146,27 @@ class PathTrackerNode(Node):
             waypoint.point.x, waypoint.point.y = float(x), float(y)
             trajectory.waypoints.append(waypoint)
         self.profile_pub.publish(trajectory)
+        self.publish_marker(trajectory.header)
         return True
+
+    def publish_marker(self, header):
+        """Publish the profile as a closed line strip coloured by speed."""
+        slow = self.get_parameter('speed_color_min').value
+        fast = self.get_parameter('speed_color_max').value
+        if fast <= slow:
+            self.get_logger().warn(
+                f'speed_color_max ({fast}) must exceed speed_color_min ({slow}): no RViz colours')
+            return
+        marker = Marker(header=header, ns='speed_profile', type=Marker.LINE_STRIP)
+        marker.pose.orientation.w = 1.0
+        marker.scale.x = 0.08
+        marker.color.a = 1.0
+        loop = np.append(np.arange(len(self.xy)), 0)  # back to the first waypoint
+        for i, (r, g, b) in zip(loop, speed_colors(self.profile[loop], slow, fast)):
+            point = Point(x=float(self.xy[i, 0]), y=float(self.xy[i, 1]), z=0.02)
+            marker.points.append(point)
+            marker.colors.append(ColorRGBA(r=float(r), g=float(g), b=float(b), a=1.0))
+        self.marker_pub.publish(marker)
 
     def odom_callback(self, msg):
         q = msg.pose.pose.orientation

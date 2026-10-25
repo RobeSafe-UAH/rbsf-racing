@@ -226,3 +226,6 @@ log/
 
 # Local test outputs (plots, reports)
 /outputs/
+
+# raceline.py previews of the built-in tracks (regenerated on demand)
+/src/base_system/rbsf_worlds/tracks/*/raceline.png

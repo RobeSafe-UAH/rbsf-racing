@@ -183,10 +183,19 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
 - [ ] Raceline tracking on the real car (RF2O + particle filter; needs Milestone 1's real-car
   validation first)
 - [x] `rbsf_msgs/Trajectory` on `planning/trajectory` (waypoints with a point and a target speed)
-  and a curvature-based speed profile in `rbsf_path_tracking` (`speed_profile.py`). MVSim
+  and a curvature-based speed profile (`rbsf_worlds/speed_profile.py`, shared with the raceline
+  tool). MVSim
   (2026-10-22), `max_lateral_acceleration: 8`: iros2026 39.2 s flying laps at 7 m/s top (constant
   4.5 m/s: 46 s; 12 m/s^2 crashes), eps_oval_single_wall 4.65 s at 4.5 m/s top (was 5.0 s)
-- [ ] Raceline optimiser
+- [x] Raceline optimiser (`scripts/tracks/raceline.py`, `rbsf_worlds/raceline.py`): offline
+  minimum curvature on the map's walls (exact-Jacobian Levenberg-Marquardt) plus a
+  swept-footprint + steering-limit check; every built-in track passes. Minimum curvature + w x
+  length, w swept and chosen on the predicted lap time (matches MVSim within 1-2%). MVSim
+  (2026-10-22, 3.0 m/s top, real-car corner limits, ground truth, no collisions): eps_circuit
+  7.51 s vs centerline 9.23 s (pure minimum curvature 8.17 s), icra2026_classic 26.35 s vs
+  30.66 s (30.15 s). With an earlier optimiser the line clipped one apex per ~8 laps through the
+  particle filter with the default 0.31 m footprint, none with MVSim's body (0.13 / 0.45 m,
+  0.34 m at the wheels). No raceline is committed yet (footprint to be measured)
 
 ## Decisions
 
@@ -228,6 +237,14 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
 - `planning/trajectory` is `rbsf_msgs/Trajectory`: a header plus `Waypoint[]`, each a
   `geometry_msgs/Point` and a target speed (m/s, an upper bound; NaN = none). Controllers compute
   their own curvature-based speed profile under it. Decided 2026-10-22.
+- Racelines are optimised offline (`scripts/tracks/raceline.py`), not by the planning slot:
+  minimum squared curvature + w x length with a steering-limit penalty, w chosen by predicted
+  lap time, offsets along the fixed centerline
+  normals within the map's walls (Levenberg-Marquardt with an exact, coloured finite-difference
+  Jacobian; box-constrained QP steps; scipy only). A
+  line is written only if the swept footprint keeps `--margin` from the walls and the curvature
+  stays under the steering limit. Its `vx` is the speed profile with the real car's limits.
+  Defaults: real chassis 0.05 / 0.43 m x 0.31 m, margin 0.15 m. Decided 2026-10-22.
 - Tracks (maps + reference lines) and world/map tools live in the shared `rbsf_worlds` package;
   simulators and controllers take `track:=<name>`. Reference lines are closed loops ordered in the
   driving direction. Decided 2026-10-01.

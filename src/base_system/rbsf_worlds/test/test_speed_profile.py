@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 import pytest
-from rbsf_path_tracking.speed_profile import curvature, speed_profile
+from rbsf_worlds.speed_profile import curvature, speed_profile
 
 
 def circle(radius, n=200):
