@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Packages written by us. The vesc and f1tenth_gym_ros submodules are upstream code that fails
+  # its own lint checks, so they are built but not tested.
+  TEST_PACKAGES: '^(rbsf_.*|stack_launcher|particle_filter|range_libc)$'
+
+jobs:
+  test:
+    name: Build and test (dev image)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the dev image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: FLAVOR=dev
+          tags: rbsf-racing:jazzy-dev
+          load: true
+          cache-from: type=gha,scope=dev
+          cache-to: type=gha,scope=dev,mode=max
+      - name: Build the workspace and run the tests
+        run: |
+          docker run --rm --net none \
+            -v "$PWD":/ros2_ws \
+            -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" -e AUTO_BUILD=0 -e TEST_PACKAGES \
+            rbsf-racing:jazzy-dev bash -lc '
+              set -e
+              colcon build --parallel-workers 2
+              colcon test --parallel-workers 2 --packages-select-regex "$TEST_PACKAGES"
+              colcon test-result --verbose'
+
+  robot-image:
+    name: Build (robot image)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the robot image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: FLAVOR=robot
+          tags: rbsf-racing:jazzy-robot
+          cache-from: type=gha,scope=robot
+          cache-to: type=gha,scope=robot,mode=max
