@@ -1,7 +1,53 @@
-# rbsf-racing
-RobeSafe Racing Stack for RoboRacer Autonomous Racing
+# 🏎️ RobeSafe Racing Stack
 
-## Installation
+**The racing stack of the [RobeSafe Research Group](https://github.com/RobeSafe-UAH)** at the
+Universidad de Alcalá, built for RoboRacer (formerly F1Tenth) autonomous racing. ROS 2 Jazzy, one
+Docker workflow, the same code on a 1/10-scale Ackermann car and in two simulators.
+
+<p align="center">
+  <img src="docs/assets/real_car.jpg" alt="RoboRacer, the RobeSafe 1/10-scale racing car" width="720">
+  <br><em>One of our RoboRacers: Hokuyo UST-10LX LiDAR, VESC and an onboard computer.</em>
+</p>
+
+| | |
+|---|---|
+| 🔭 **Autonomous exploration** | Wall following or Follow-the-Gap, with Cartographer and SLAM Toolbox mapping side by side |
+| 🏁 **Raceline tracking** | Particle-filter localization on the known map, Pure Pursuit or MAP at a curvature-based speed profile |
+| 🛡️ **Safety first** | Every command goes through `drive_gate`: deadman, arming, fail-closed |
+| 🧩 **Swappable slots** | mapping, localization, perception, planning and controller, composed per behaviour |
+
+![Track catalog preview: iros2026](docs/map_catalog/iros2026.png)
+
+*One of the built-in tracks, ready for both simulators ([catalog](docs/MAP_CATALOG.md)).*
+
+## 🚀 Get Started
+
+Needs git and Docker 23+. Nothing else is installed on the host.
+
+```bash
+git clone --branch dev --recurse-submodules https://github.com/RobeSafe-UAH/rbsf-racing.git
+cd rbsf-racing
+make build && make run      # the workspace builds on start; `make attach` opens another shell
+```
+
+Then, inside the container:
+
+| App | Simulation (`mvsim` or `f1tenth`) | Real car |
+|---|---|---|
+| 🔭 **Autonomous exploration** | `ros2 launch stack_launcher autonomous_exploration.launch.py platform:=mvsim track:=spielberg` | `ros2 launch stack_launcher autonomous_exploration.launch.py platform:=real` |
+| 🏁 **Raceline tracking** | `ros2 launch stack_launcher raceline_tracking.launch.py platform:=mvsim track:=iros2026` | `ros2 launch stack_launcher raceline_tracking.launch.py platform:=real track:=/ros2_ws/maps/<stamp>/track/<name>.yaml` |
+
+- Swap `platform:=mvsim` for `f1tenth` to use the other simulator. Both take any track from
+  [`docs/MAP_CATALOG.md`](docs/MAP_CATALOG.md).
+- Explore first, then save the maps with `ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger`
+  and build the track for the raceline app ([from a session to a track](#-from-a-mapping-session-to-a-track)).
+- **On the car:** pair the gamepad, press START to arm, hold RB to drive autonomously (release
+  stops the car) and LB for manual. Do the first-run checks with the wheels off the ground
+  ([Real car](#-real-car)). Full protocol: [`docs/RACE_DAY.md`](docs/RACE_DAY.md).
+- The car computer can run only the platform side, with the laptop running the app
+  (`deployment:=distributed`, same `ROS_DOMAIN_ID` on both).
+
+## 🛠️ Installation
 
 Requires git and Docker (with BuildKit, Docker 23+). Add the NVIDIA Container Toolkit for GPU
 access. Nothing else is installed on the host.
@@ -36,7 +82,7 @@ Images are based on ROS 2 Jazzy / Ubuntu 24.04 and contain nothing specific to t
 so rebuilding (on a workstation or on the car) reuses cached layers. When a `package.xml`
 or `pyproject.toml` changes, the container warns you to run `make build` again.
 
-## Naming
+## 🏷️ Naming
 
 Every car lives in its own namespace, in simulation and on the real cars:
 
@@ -50,7 +96,7 @@ Inside each namespace: `scan` (`sensor_msgs/LaserScan`), `odom` (`nav_msgs/Odome
 The TF tree is `map -> <ns>/odom -> <ns>/base_link -> <ns>/laser`, and `map -> <ns>/odom` belongs
 to the mapping slot (a SLAM, or the identity when there is none).
 
-## Tracks
+## 🗺️ Tracks
 
 `src/base_system/rbsf_worlds` holds the tracks every simulator (and later the car) uses: a ROS map
 (yaml + image) plus the reference lines to drive on. Both simulators take `track:=<name>`.
@@ -65,7 +111,7 @@ footprint along it (clearance to the walls and the steering limit), with the cur
 speed profile in its `vx` column. It writes `<name>_raceline.csv` next to the yaml only if the
 line passes; `line:=auto` then drives it. Details in the tracks README.
 
-## Apps
+## 🤖 Apps
 
 The stack is split into five interchangeable functional slots (mapping, localization,
 perception, planning, controller) that behaviours in `stack_launcher` compose into apps, on any
@@ -127,7 +173,7 @@ stateDiagram-v2
   clock cannot keep a stale command alive. Buttons and timeouts are in
   `src/base_system/rbsf_safety/config/drive_gate_{sim,real}.yaml`.
 
-### Autonomous exploration
+### 🔭 Autonomous exploration
 
 The car follows the inner track boundary, or centres itself between both (`rbsf_wall_following`,
 PI on the nearest LiDAR points beside and ahead of the car, with gap and corner handling) while the mapping slot
@@ -155,7 +201,7 @@ ros2 service call /r0/mapping/save_maps std_srvs/srv/Trigger
   simulators, and `session.yaml` (platform, track, and each map's frame and pose in `map`). Save
   after driving a little past the start line, so the end of the lap is in both maps.
 
-#### From a mapping session to a track
+#### 🧩 From a mapping session to a track
 
 Step by step for the real car, from bringup to a checked track: [`docs/RACE_DAY.md`](docs/RACE_DAY.md).
 
@@ -236,7 +282,7 @@ ros2 launch stack_launcher raceline_tracking.launch.py track:=/ros2_ws/maps/<sta
 - In simulation the car drives without a joystick (`require_deadman` defaults to `false`). With
   a gamepad plugged in, LB + sticks takes over at any time.
 
-### Raceline tracking
+### 🏁 Raceline tracking
 
 The car follows the track's reference line (legacy `03_centerline_tracking`). The identity
 planning publishes it on `/r0/planning/trajectory` (`rbsf_msgs/Trajectory`, the raceline if the
@@ -259,11 +305,31 @@ ros2 launch stack_launcher raceline_tracking.launch.py platform:=real deployment
 #   initial_pose:=x,y,yaw|global (particle filter start; default the reference line's start)
 ```
 
+**Localization.** The simulators use ground truth in the `map` frame (identity mapping and
+localization). On `platform:=real` there is no ground truth, so the defaults are
+`mapping:=map_server` (`rbsf_map_manager`, the track's map on `/map`, no TF) and
+`localization:=particle_filter` (`state_estimation/particle_filter`, a port of
+f1tenth/particle_filter on RangeLibc). The filter is fed by the platform `odom` (RF2O on the car)
+and the scan, and it owns `map -> r0/odom`. It starts at the start of the reference line, where
+the car must be placed. `initial_pose:=x,y,yaw` starts it elsewhere, `initial_pose:=global`
+spreads it over the whole map (it can lock onto the wrong part of a track with look-alike
+corridors), and RViz's *2D Pose Estimate* re-seeds it at any time. In MVSim on `eps_circuit` it
+holds 6 cm / 1.2 deg RMSE against ground truth. Following the centerline is validated on the
+car ([`docs/RACE_DAY.md`](docs/RACE_DAY.md) §6); following an optimised raceline is not.
+
 `rviz_slam` (in the container) opens the stack's RViz view. It shows the reference line coloured
 by the controller's speed profile (`<controller>/speed_profile`: red at `speed_color_min`, 1.0 m/s,
 to green at `speed_color_max`, 3.0 m/s), the lookahead target, the path driven so far, the car,
 its scan and the particle filter's particles. The plain `planning/trajectory/path` display is
 off by default.
+
+**Live plots.** `plot_speed [robot]` (`rbsf_telemetry`) serves a live speed plot on
+<http://localhost:8090>: the controller's command (`drive_gate/auto_cmd`), what `drive_gate` sends,
+the VESC measurement and the odometry. Series are numeric message fields listed in
+`src/common/rbsf_telemetry/config/speed.yaml` (`label=topic/field/path`, relative to the car's
+namespace), so a new plot is a new YAML. It subscribes to each topic once it appears, so topics
+that show up late over the network are not lost, and it stamps points on reception, so machines with
+skewed clocks plot together. Set `host: 0.0.0.0` to open the page from another machine.
 
 Both controllers are one node, `rbsf_path_tracking`'s `path_tracker`, with the same topics and
 parameters and a different `steering_law`. Each aims at the waypoint a lookahead
@@ -289,7 +355,7 @@ everything, `speed:=` still overrides). `eps_oval_single_wall` has one: 4.5 m/s 
 lookahead (0.9 + 0.2 v) to take the hairpin's S-bend, 4.65 s laps in MVSim; `iros2026` runs
 7 m/s top (39 s laps).
 
-### Real car
+### 🚗 Real car
 
 ```bash
 # Everything on the car
@@ -324,7 +390,7 @@ First run of a new build or config (docs/DESIGN_PHILOSOPHY.md §6.4), **wheels o
 4. In distributed mode, cut the network while holding RB: the car must stop
    (`AUTO_CMD_TIMEOUT`).
 
-## Simulators
+## 🕹️ Simulators
 
 The dev image ships two simulators. Their packages live in `src/base_system/` next to the
 hardware bringup, so they act as drop-in replacements for the real car: both give every car the
@@ -333,7 +399,7 @@ is ground truth whose origin is the map origin. They also publish `/<ns>/ground_
 `map`) and the track's map as `/ground_truth/map`. RF2O is real-only: it does poorly in the
 feature-poor synthetic worlds.
 
-### Pure Pursuit demo
+### 🎯 Pure Pursuit demo
 
 Every car follows the track's raceline (or its centerline when there is none) at a constant
 speed with `rbsf_path_tracking` (`controller:=pure_pursuit|map`), spawned `spacing` metres apart
@@ -354,7 +420,7 @@ raceline (which passes 0.25 m from the walls at its apexes) makes the cars graze
 `line:=centerline speed:=3.0` there for a contact-free run. Its gains are in
 `src/controller/rbsf_path_tracking/config/{pure_pursuit,map}_sim.yaml`.
 
-### f1tenth_gym
+### 🧪 f1tenth_gym
 
 [`f1tenth_gym_ros`](https://github.com/f1tenth/f1tenth_gym_ros) (branch `dev-jazzy`, submodule)
 bridges the [f1tenth_gym](https://github.com/f1tenth/f1tenth_gym) simulator to ROS. Launch it
@@ -380,7 +446,7 @@ ros2 launch rbsf_f1tenth_gym f1tenth_gym.launch.py
   only the bridge runs on that interpreter. The rest of the stack stays on NumPy 1.x, which the
   Jazzy binaries (e.g. `cv_bridge`) need.
 
-### MVSim
+### 🌍 MVSim
 
 [MVSim](https://github.com/MRPT/mvsim) (`ros-jazzy-mvsim`) through `rbsf_mvsim`:
 
