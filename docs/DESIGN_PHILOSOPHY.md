@@ -100,7 +100,7 @@ at a glance.
 |---|---|---|---|
 | **mapping** | Provide `/map`. If it does SLAM, or is the identity, it also owns `map -> <ns>/odom`. | `dual_slam`, `slam_toolbox`, `cartographer` (SLAM, `rbsf_dual_slam`); `map_server` (known track from `rbsf_worlds` or a session, `rbsf_map_manager`, no TF) | Static identity `map -> <ns>/odom`, and on the simulators `/ground_truth/map` relayed to `/map`. |
 | **localization** | Estimate the car's pose in `map`. | `particle_filter` (MCL with RangeLibc on a known map, `state_estimation/particle_filter`, owns `map -> <ns>/odom`) | `odom` composed with `map -> <ns>/odom` (TF) on `localization/odom`. A real map-frame pose alongside a SLAM mapper, ground truth on the simulators. |
-| **perception** | Detect opponents and obstacles. | LiDAR opponent detection | Publishes an empty opponent list at a fixed rate. |
+| **perception** | Detect opponents and obstacles. | LiDAR opponent detection and tracking (planned) | Publishes an empty opponent list at a fixed rate. |
 | **planning** | Produce the trajectory to follow: global line, overtaking, avoidance. | raceline / overtaking planner | Republishes the track's reference line (`rbsf_worlds`, `track:=`) as the trajectory (`reference_line`). Empty without a track. |
 | **controller** | Turn trajectory + pose (or raw scan, for reactive controllers) into an Ackermann command. | `pure_pursuit`, `map` (`rbsf_path_tracking`), `wall_following`, `follow_the_gap` | Publishes zero commands (speed 0, steering 0). The car stays still. |
 
@@ -243,15 +243,15 @@ ros2 launch stack_launcher raceline_tracking.launch.py platform:=mvsim track:=ir
   owner of `map -> <ns>/odom`. A behaviour can default slots per platform: `raceline_tracking`
   uses identity on the simulators and `map_server` + `particle_filter` on `real`.
 
-Planned behaviours (legacy equivalents in parentheses):
+Behaviours (legacy equivalents in parentheses). Only `autonomous_exploration` and
+`raceline_tracking` exist as launch files today; the others are planned:
 
-| Behaviour | mapping | localization | perception | planning | controller |
-|---|---|---|---|---|---|
-| `teleop_mapping` (`00_teleop_slam`) | dual_slam | identity | identity | identity | identity |
-| `wall_following` (`01_wall_following`) | identity | identity | identity | identity | wall_following |
-| `autonomous_exploration` (`02_autonomous_slam`) | dual_slam | identity | identity | identity | wall_following (or follow_the_gap) |
-| `raceline_tracking` (`03_centerline_tracking`) | map_server (identity in sim) | particle filter (identity in sim) | identity | identity | pure_pursuit (or map) |
-
+| Behaviour | Status | mapping | localization | perception | planning | controller |
+|---|---|---|---|---|---|---|
+| `teleop_mapping` (`00_teleop_slam`) | planned | dual_slam | identity | identity | identity | identity |
+| `wall_following` (`01_wall_following`) | planned | identity | identity | identity | identity | wall_following |
+| `autonomous_exploration` (`02_autonomous_slam`) | implemented | dual_slam | identity | identity | identity | wall_following (or follow_the_gap) |
+| `raceline_tracking` (`03_centerline_tracking`) | implemented | map_server (identity in sim) | particle_filter (identity in sim) | identity | identity | pure_pursuit (or map) |
 ### 5.2 Deployment
 
 | `deployment` | Car / simulator machine | Compute machine |
@@ -391,12 +391,13 @@ src/
     rbsf_map_manager/    # mapping: map_server (known track map, no TF)
     particle_filter/     # localization: MCL (port of f1tenth/particle_filter, MIT)
     range_libc/          # RangeLibc ray casting for the particle filter (Apache-2.0)
-  perception/        # opponent detection, ...
+  perception/        # opponent detection and tracking (planned)
   planning/          # planners, ...
   controller/        # rbsf_path_tracking, rbsf_wall_following, rbsf_follow_the_gap, ...
   common/
     rbsf_identity/       # identity implementation of every slot
     rbsf_msgs/           # stack messages (Waypoint, Trajectory)
+    rbsf_telemetry/      # web_plot: live plots of any topic field (plot_speed)
   stack_launcher/    # behaviours, platform.launch.py, implementation registry
 ```
 

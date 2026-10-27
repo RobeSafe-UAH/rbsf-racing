@@ -103,7 +103,9 @@ editing the Dockerfile:
   generated at launch (`rbsf_mvsim/world.py`) because MVSim defines vehicles inside the world.
 - Python packages go in `pyproject.toml` (then run `uv lock`) only if apt/rosdep cannot provide
   them. They are installed into the system interpreter, and `numpy<2` is enforced to stay ABI-compatible with
-  the Jazzy binaries.
+  the Jazzy binaries. uv does not see apt packages, so it would put pip copies of their transitive
+  dependencies over the apt ones: list those that rosdep provides (numpy, scipy, matplotlib) in
+  `override-dependencies` with a never-true marker.
 - The entrypoint warns when the mounted workspace's `package.xml` or Python lock differ from
   what the image was built with. Then you need `make build`.
 - The image's `/etc/rbsf/ros_env.sh` hands over to the mounted `docker/ros_env.sh`, so shell
@@ -142,8 +144,8 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
 - [x] Docker images, Makefile, entrypoint (Jazzy / Ubuntu 24.04)
 - [x] Platform drivers for Jazzy (`f1tenth/vesc` jazzy submodule; `drive_gate` replaces
   ackermann_mux and joy_teleop)
-- [x] Hardware bringup (`rbsf_bringup`) and MVSim simulation packages. The real car is not
-  tested yet.
+- [x] Hardware bringup (`rbsf_bringup`) and MVSim simulation packages, validated on the
+  real car.
 - [x] Wall-following controller (`rbsf_wall_following`), verified in MVSim and f1tenth_gym.
   Default `follow_side: left` explores eps_oval_single_wall in both sims with DualSLAM (maps
   pass inspection, 2026-10-19). Known gaps: crashes on levine's inner-wall recess, and on eps
@@ -159,7 +161,7 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   (`min_score` trade-off, see `config/cartographer_sim.lua`)
 - [x] Top-level launchers (`stack_launcher`) with `platform:=real|mvsim|f1tenth`,
   `deployment:=local|distributed`
-- [ ] Real-car validation (design doc §6.4 checklist, then wall-following gains)
+- [x] Real-car validation (design doc §6.4 checklist, wall-following gains)
 
 **Milestone 2 — raceline tracking (sim first).** Follow a pre-built track's reference line
 (legacy `03_centerline_tracking`), behaviour `raceline_tracking`. Status:
@@ -180,8 +182,9 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
   bias, under half a 5 cm map cell), 0.3 s recovery from a 0.5 m / 20 deg kick, 10 ms updates.
   Global initialization (`initial_pose:=global`) locks onto the wrong part of eps_circuit, so the
   filter starts at the reference line's start by default
-- [ ] Raceline tracking on the real car (RF2O + particle filter; needs Milestone 1's real-car
-  validation first)
+- [x] Centerline tracking on the real car (RF2O + particle filter), validated
+- [ ] Raceline tracking on the real car (following an optimised raceline at speed, not only the
+  centerline): not validated
 - [x] `rbsf_msgs/Trajectory` on `planning/trajectory` (waypoints with a point and a target speed)
   and a curvature-based speed profile (`rbsf_worlds/speed_profile.py`, shared with the raceline
   tool). MVSim
