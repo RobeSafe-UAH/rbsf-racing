@@ -229,3 +229,8 @@ log/
 
 # raceline.py previews of the built-in tracks (regenerated on demand)
 /src/base_system/rbsf_worlds/tracks/*/raceline.png
+
+# Slide assets and the opponent perception package (not part of the release)
+/docs/slides/
+/src/perception/
+/docs/study_guides/
