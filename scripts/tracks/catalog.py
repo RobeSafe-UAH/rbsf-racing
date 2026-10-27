@@ -71,6 +71,10 @@ SOURCES = {
     'iros2026': (
         'IROS 2026 RoboRacer competition',
         "Generated from the organisers' drawing (thin wall lines)."),
+    'iv2026': (
+        'IEEE IV 2026 simulation map',
+        "Generated from the organisers' drawing (1 px wall lines). The drawing gives no driving "
+        'direction: counter-clockwise by choice.'),
     'eps_circuit': (
         'Mapped by our car',
         'Session `20261021_122444`, Cartographer.'),

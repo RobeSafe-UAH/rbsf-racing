@@ -105,6 +105,19 @@ wide:
         src/base_system/rbsf_worlds/tracks/icra2025/icra2025_original.yaml \
         --name icra2025 --start 4.973 2.266 --cw
 
+`iv2026` is the IEEE IV 2026 simulation map (`IV_2026_SIM`), kept as `iv2026_original.{png,yaml}`
+(1561 x 1211 px at 0.0625 m, origin `[0, 0]`, the track in its middle). Like iros2026 it is a drawing,
+but of 1 px wall lines that touch only diagonally, so free pixels leak through them and
+`drawn_track.py` needs `--thin-walls` (free space 4-connected). The drawing also has 15 stray
+dots (9 px, 0.56 m) in the grass and infield and a solid block next to the top-left corner of the
+inner wall; none is in the corridor, and the generated map drops them. The start is the corridor
+point nearest that block. The drawing gives no driving direction, so it is counter-clockwise
+(change `--ccw` if the organisers say otherwise). The corridor is 1.0-1.9 m wide:
+
+    python3 scripts/tracks/drawn_track.py \
+        src/base_system/rbsf_worlds/tracks/iv2026/iv2026_original.yaml \
+        --name iv2026 --start 50.0 46.4 --ccw --thin-walls
+
 `eps_circuit` is the exception to the rule below: a car-mapped track kept so both simulators
 can drive it by name. It is `session_track.py centerline --source cartographer` output, copied
 from `maps/20261021_122444/track/`; the corridor is 1.0-1.9 m wide, driven counter-clockwise.

@@ -75,3 +75,16 @@ def test_icra2025_centerline_starts_on_the_aurorus_line_and_runs_clockwise():
     heading = np.array([(b - a)[1], -(b - a)[0]]) / np.linalg.norm(b - a)
     step = xy[3] - xy[0]
     assert step @ heading / np.linalg.norm(step) > 0.95
+
+
+def test_iv2026_centerline_is_a_counter_clockwise_loop_inside_the_corridor():
+    path = find_waypoints(track_yaml('iv2026'))
+    assert path.name == 'iv2026_centerline.csv'
+    xy, _ = load_waypoints(path)
+    _, total = arc_lengths(xy)
+    assert abs(total - 139.9) < 1.0
+    gaps = np.linalg.norm(np.diff(xy, axis=0, append=xy[:1]), axis=1)
+    assert gaps.max() < 0.15
+    widths = np.loadtxt(path, delimiter=',', comments='#')[:, 2:]
+    assert widths.min() > 0.4
+    assert signed_area(xy) > 0

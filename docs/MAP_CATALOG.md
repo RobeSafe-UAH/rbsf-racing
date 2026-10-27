@@ -18,6 +18,7 @@ start/finish line.
 | [`icra2026_classic`](#icra2026_classic) | ICRA 2026 RoboRacer competition, Vienna: Classic Cup | 80.8 m | 1.41-3.48 m | counter-clockwise | - |
 | [`icra2026_master`](#icra2026_master) | ICRA 2026 RoboRacer competition, Vienna: Master Cup | 152.5 m | 1.04-5.62 m | counter-clockwise | 1 bridge |
 | [`iros2026`](#iros2026) | IROS 2026 RoboRacer competition | 209.4 m | 1.71-3.50 m | counter-clockwise | - |
+| [`iv2026`](#iv2026) | IEEE IV 2026 simulation map | 139.9 m | 1.03-1.93 m | counter-clockwise | - |
 | [`eps_circuit`](#eps_circuit) | Mapped by our car | 21.1 m | 1.01-1.93 m | counter-clockwise | - |
 | [`eps_oval_single_wall`](#eps_oval_single_wall) | Built from one of our mapping sessions | 18.2 m | 1.19-2.62 m | counter-clockwise | - |
 | [`levine`](#levine) | f1tenth_gym_ros `maps/levine` | 61.8 m | 1.57-3.42 m | counter-clockwise | 38 cones |
@@ -87,6 +88,22 @@ IROS 2026 RoboRacer competition. Generated from the organisers' drawing (thin wa
 | Footprint | 43.9 x 23.4 m (drivable space), 5 cm/px |
 | Extras | - |
 | Path-tracking tunings | `iros2026_sim.yaml` |
+
+## iv2026
+
+![iv2026](map_catalog/iv2026.png)
+
+IEEE IV 2026 simulation map. Generated from the organisers' drawing (1 px wall lines). The drawing
+gives no driving direction: counter-clockwise by choice.
+
+| | |
+|---|---|
+| Reference lines | centerline 139.9 m |
+| Corridor width | 1.03-1.93 m |
+| Driving direction | counter-clockwise, from (50.04, 46.47) |
+| Footprint | 26.6 x 30.8 m (drivable space), 6.25 cm/px |
+| Extras | - |
+| Path-tracking tunings | - |
 
 ## eps_circuit
 

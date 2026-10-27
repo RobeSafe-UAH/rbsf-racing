@@ -44,11 +44,16 @@ def split_ring(corridor):
     return infield, ~outer.astype(bool)
 
 
-def corridor_from_drawing(img, occupied_thresh):
-    """Corridor of a drawn map: the largest free region not touching the image border."""
+def corridor_from_drawing(img, occupied_thresh, thin_walls=False):
+    """
+    Corridor of a drawn map: the largest free region not touching the image border.
+
+    thin_walls: the walls are 1 px lines drawn 8-connected, which free pixels leak through
+    diagonally, so free space is 4-connected.
+    """
     occupied = (255 - img.astype(np.float64)) / 255.0 > occupied_thresh
     n, labels, stats, _ = cv2.connectedComponentsWithStats(
-        (~occupied).astype(np.uint8), connectivity=8)
+        (~occupied).astype(np.uint8), connectivity=4 if thin_walls else 8)
     border = set(np.unique(np.concatenate(
         [labels[0], labels[-1], labels[:, 0], labels[:, -1]])))
     inner = [i for i in range(1, n) if i not in border]

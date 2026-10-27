@@ -8,6 +8,8 @@ that does not touch the image border.
 
 The reference line needs an annulus (one loop, one infield). Tracks with more than that get two
 options, applied to the centerline only (the simulator map keeps every wall gap and branch):
+    --thin-walls     the walls are 1 px lines drawn 8-connected (free space leaks through their
+                     diagonal steps): treat free space as 4-connected
     --close-gaps M   close wall gaps narrower than M metres: open track borders (dashed walls)
                      the LiDAR sees through but no car fits through
     --block X0 Y0 X1 Y1
@@ -58,6 +60,8 @@ def main():
                         help='Centerline smoothing sigma (m).')
     parser.add_argument('--edge-sigma', type=float, default=1.5,
                         help='Wall edge anti-aliasing sigma (px).')
+    parser.add_argument('--thin-walls', action='store_true',
+                        help='Walls are 1 px 8-connected lines: free space is 4-connected.')
     parser.add_argument('--close-gaps', type=float, default=0.0, metavar='M',
                         help='Close wall gaps narrower than M metres for the centerline.')
     parser.add_argument('--block', type=float, nargs=4, action='append', default=[],
@@ -72,7 +76,7 @@ def main():
     out_dir = args.out_dir or args.map_yaml.parent
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    corridor = corridor_from_drawing(img, spec['occupied_thresh'])
+    corridor = corridor_from_drawing(img, spec['occupied_thresh'], args.thin_walls)
     cv2.imwrite(str(out_dir / f'{args.name}.png'), corridor_image(corridor, args.edge_sigma))
 
     route = route_corridor(corridor, spec['resolution'], spec['origin'], args.close_gaps,
