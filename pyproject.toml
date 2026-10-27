@@ -14,3 +14,11 @@ dependencies = []
 package = false
 # ROS Jazzy binaries (cv_bridge, tf_transformations, ...) are built against NumPy 1.x.
 constraint-dependencies = ["numpy<2"]
+# Never install pip copies of what rosdep provides (python3-numpy, python3-scipy,
+# python3-matplotlib): uv does not see the apt packages and would shadow them in
+# /usr/local. A marker that is never true drops them from the lock's install set.
+override-dependencies = [
+    "numpy; sys_platform == 'never'",
+    "scipy; sys_platform == 'never'",
+    "matplotlib; sys_platform == 'never'",
+]

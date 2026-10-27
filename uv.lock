@@ -4,6 +4,11 @@ requires-python = "==3.12.*"
 
 [manifest]
 constraints = [{ name = "numpy", specifier = "<2" }]
+overrides = [
+    { name = "matplotlib", marker = "sys_platform == 'never'" },
+    { name = "numpy", marker = "sys_platform == 'never'" },
+    { name = "scipy", marker = "sys_platform == 'never'" },
+]
 
 [[package]]
 name = "rbsf-racing"
