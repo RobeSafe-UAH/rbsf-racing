@@ -265,11 +265,10 @@ exploration behaviour (reactive wall following + simultaneous SLAM mapping, lega
     the `state_estimation` block. Odometry estimators (RF2O) live there too, but they are not a
     slot: the platform launches them. Decided 2026-10-01.
 
-## Open decisions
+## Post-1.0 decisions
 
-Confirm these with the user before assuming:
+Deferred past v1.0. Confirm with the user before assuming, and move each item to **Decisions**
+once it is settled:
 - Whether performance-critical nodes move to C++ (`ament_cmake`).
 - The rest of `docs/DESIGN_PHILOSOPHY.md` §9 (`OpponentArray` / `GateState`, runtime orchestrator,
   VESC brake).
-
-Move each item to **Decisions** once it is settled.
